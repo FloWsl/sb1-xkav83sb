@@ -9,6 +9,13 @@ export interface Ingredient {
   r: number | string;
 }
 
+export interface ShoppingListItem extends Ingredient {
+  isChecked: boolean;
+  recipeId?: string;
+  recipeName?: string;
+  customItem?: boolean;
+}
+
 export interface Equipment {
   n: string;
   d: string;
