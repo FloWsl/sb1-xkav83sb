@@ -10,10 +10,13 @@ import {
   Dimensions,
   FlatList,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../../styles';
+import { usePlanStore } from '../../store/planStore';
+import type { ShoppingListItem } from '../../types/schema';
 
 const { width } = Dimensions.get('window');
 
@@ -38,11 +41,12 @@ const menus = [
     season: 'Printemps',
     isPremium: true,
     servings: 4,
-    ingredients: {
-      'Légumes': ['Carottes', 'Courgettes', 'Poivrons'],
-      'Protéines': ['Quinoa', 'Pois chiches'],
-      'Épicerie': ['Lait de coco', 'Curry en poudre']
-    }
+    ingredients: [
+      { id: '1', cat: 'Légumes', n: 'Carottes', q: '500', u: 'g', notes: 'bio', r: '100', isChecked: false },
+      { id: '2', cat: 'Légumes', n: 'Courgettes', q: '3', u: 'pièces', notes: '', r: '0', isChecked: false },
+      { id: '3', cat: 'Céréales', n: 'Quinoa', q: '250', u: 'g', notes: '', r: '0', isChecked: false },
+      { id: '4', cat: 'Épicerie', n: 'Lait de coco', q: '400', u: 'ml', notes: '', r: '0', isChecked: false }
+    ]
   },
   {
     id: '2',
@@ -58,11 +62,12 @@ const menus = [
     season: 'Été',
     isPremium: false,
     servings: 4,
-    ingredients: {
-      'Légumes': ['Tomates cerises', 'Concombre', 'Oignons rouges'],
-      'Protéines': ['Pois chiches', 'Feta'],
-      'Épicerie': ['Pâtes', 'Huile d\'olive']
-    }
+    ingredients: [
+      { id: '5', cat: 'Légumes', n: 'Tomates cerises', q: '500', u: 'g', notes: '', r: '0', isChecked: false },
+      { id: '6', cat: 'Légumes', n: 'Concombre', q: '1', u: 'pièce', notes: '', r: '0', isChecked: false },
+      { id: '7', cat: 'Épicerie', n: 'Pâtes', q: '500', u: 'g', notes: '', r: '0', isChecked: false },
+      { id: '8', cat: 'Produits Laitiers', n: 'Feta', q: '200', u: 'g', notes: '', r: '0', isChecked: false }
+    ]
   }
 ];
 
@@ -73,8 +78,15 @@ export default function DiscoveryScreen() {
   const [selectedDiets, setSelectedDiets] = useState([]);
   const [selectedTime, setSelectedTime] = useState(null);
   const colorScheme = useColorScheme();
-  const themeColors = styles.getThemeColors(colorScheme);
   const isDark = colorScheme === 'dark';
+  const themeColors = styles.getThemeColors(colorScheme);
+
+  // Get plan store actions
+  const { 
+    setSelectedPlan, 
+    loadIngredientsFromPlan, 
+    selectedPlanId 
+  } = usePlanStore();
 
   const toggleDiet = (diet) => {
     setSelectedDiets(prev => 
@@ -84,11 +96,41 @@ export default function DiscoveryScreen() {
     );
   };
 
+  const handlePlanSelection = (menu) => {
+    // If a plan is already selected, ask for confirmation
+    if (selectedPlanId) {
+      Alert.alert(
+        'Change Menu Plan?',
+        'Selecting a new menu will replace your current shopping list. Do you want to continue?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Continue',
+            style: 'destructive',
+            onPress: () => {
+              setSelectedPlan(menu.id);
+              loadIngredientsFromPlan(menu.ingredients);
+              Alert.alert('Success', 'Shopping list updated with the new menu plan');
+            },
+          },
+        ]
+      );
+    } else {
+      setSelectedPlan(menu.id);
+      loadIngredientsFromPlan(menu.ingredients);
+      Alert.alert('Success', 'Shopping list created from the selected menu plan');
+    }
+  };
+
   const renderMenuCard = ({ item }) => (
     <TouchableOpacity
       style={[
         localStyles.menuCard,
-        isDark && localStyles.menuCardDark
+        isDark && localStyles.menuCardDark,
+        selectedPlanId === item.id && localStyles.selectedMenuCard
       ]}
       onPress={() => setSelectedMenu(item)}>
       <Image
@@ -108,6 +150,12 @@ export default function DiscoveryScreen() {
           <Ionicons name="time-outline" size={14} color="#FFFFFF" />
           <Text style={localStyles.badgeText}>{item.timeInvestment}</Text>
         </View>
+        {selectedPlanId === item.id && (
+          <View style={localStyles.selectedBadge}>
+            <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
+            <Text style={localStyles.badgeText}>Selected</Text>
+          </View>
+        )}
       </View>
       <View style={[localStyles.cardContent, isDark && localStyles.cardContentDark]}>
         <Text style={[localStyles.menuTitle, isDark && localStyles.textLight]}>
@@ -314,7 +362,13 @@ export default function DiscoveryScreen() {
                   </View>
                 ) : (
                   <View style={localStyles.tabContent}>
-                    {Object.entries(selectedMenu.ingredients).map(([category, items]) => (
+                    {Object.entries(
+                      selectedMenu.ingredients.reduce((acc, item) => {
+                        acc[item.cat] = acc[item.cat] || [];
+                        acc[item.cat].push(item);
+                        return acc;
+                      }, {})
+                    ).map(([category, items]) => (
                       <View key={category} style={localStyles.ingredientCategory}>
                         <Text style={[localStyles.categoryTitle, isDark && localStyles.textLight]}>
                           {category}
@@ -323,7 +377,7 @@ export default function DiscoveryScreen() {
                           <Text 
                             key={index}
                             style={[localStyles.ingredientItem, isDark && localStyles.textLight]}>
-                            • {item}
+                            • {item.n} ({item.q} {item.u})
                           </Text>
                         ))}
                       </View>
@@ -332,13 +386,19 @@ export default function DiscoveryScreen() {
                 )}
 
                 <TouchableOpacity
-                  style={localStyles.selectButton}
+                  style={[
+                    localStyles.selectButton,
+                    selectedPlanId === selectedMenu.id && localStyles.selectedButton
+                  ]}
                   onPress={() => {
-                    // Handle plan selection
+                    handlePlanSelection(selectedMenu);
                     setSelectedMenu(null);
                   }}>
                   <Text style={localStyles.selectButtonText}>
-                    SÉLECTIONNER CE PLAN
+                    {selectedPlanId === selectedMenu.id 
+                      ? 'PLAN SÉLECTIONNÉ'
+                      : 'SÉLECTIONNER CE PLAN'
+                    }
                   </Text>
                 </TouchableOpacity>
 
@@ -427,6 +487,10 @@ const localStyles = StyleSheet.create({
   menuCardDark: {
     backgroundColor: '#1A1A1A',
   },
+  selectedMenuCard: {
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
   menuImage: {
     width: '100%',
     height: 200,
@@ -448,6 +512,15 @@ const localStyles = StyleSheet.create({
   },
   freeBadge: {
     backgroundColor: '#4CAF50',
+  },
+  selectedBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   timeBadge: {
     backgroundColor: '#666666',
@@ -596,6 +669,9 @@ const localStyles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
+  },
+  selectedButton: {
+    backgroundColor: '#4CAF50',
   },
   selectButtonText: {
     color: '#FFFFFF',
