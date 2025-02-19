@@ -1,3 +1,4 @@
+// app/types/schema.ts
 export interface Ingredient {
   id: string;
   cat: string;
@@ -33,6 +34,7 @@ export interface Task {
   i: string;
   c: boolean;
   pr: string;
+  td?: number; // Optional timer duration in minutes
 }
 
 export interface Section {
@@ -69,4 +71,55 @@ export interface BatchCookingData {
   r: Recipe[];
   b: BatchPlan;
   meta: Meta;
+}
+
+// New interfaces for app functionality
+
+export interface UserPreferences {
+  dietaryPreferences: string[];
+  excludedIngredients: string[];
+  householdSize: number;
+  kitchenEquipment: string[];
+  isPremium: boolean;
+}
+
+export interface ActiveTimer {
+  id: string;
+  name: string;
+  duration: number; // in seconds
+  startTime: Date;
+  isPaused: boolean;
+  pausedTimeRemaining?: number;
+  recipeId?: string;
+}
+
+export interface ActivePlanState {
+  planId: string;
+  activationDate: Date;
+  currentPhase?: string;
+  completedTasks: string[];
+  activeTimers: ActiveTimer[];
+  notes: string;
+}
+
+export interface PlanSummary {
+  id: string;
+  title: string;
+  imageUrl: string;
+  description: string;
+  timeEstimate: string;
+  recipeCount: number;
+  tags: string[];
+  isPremium: boolean;
+  isNew: boolean;
+}
+
+export type CookingPlan = BatchCookingData;
+
+export interface Subscription {
+  level: 'free' | 'premium';
+  startDate: Date;
+  endDate?: Date;
+  autoRenew: boolean;
+  paymentMethod?: string;
 }
