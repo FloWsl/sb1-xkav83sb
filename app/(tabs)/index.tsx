@@ -1,3 +1,4 @@
+// app/[tabs]/index.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../../styles';
 import { usePlanStore } from '../../store/planStore';
+import useBatchCooking from '../../hooks/useBatchCooking';
 import type { ShoppingListItem } from '../../types/schema';
 
 const { width } = Dimensions.get('window');
@@ -35,18 +37,54 @@ const menus = [
     recipes: [
       'Salade de quinoa aux légumes printaniers',
       'Curry de légumes au lait de coco',
-      'Buddha bowl aux légumes rôtis'
+      'Buddha bowl aux légumes rôtis',
     ],
     tags: ['Végétarien', 'Sans Gluten'],
     season: 'Printemps',
     isPremium: true,
     servings: 4,
     ingredients: [
-      { id: '1', cat: 'Légumes', n: 'Carottes', q: '500', u: 'g', notes: 'bio', r: '100', isChecked: false },
-      { id: '2', cat: 'Légumes', n: 'Courgettes', q: '3', u: 'pièces', notes: '', r: '0', isChecked: false },
-      { id: '3', cat: 'Céréales', n: 'Quinoa', q: '250', u: 'g', notes: '', r: '0', isChecked: false },
-      { id: '4', cat: 'Épicerie', n: 'Lait de coco', q: '400', u: 'ml', notes: '', r: '0', isChecked: false }
-    ]
+      {
+        id: '1',
+        cat: 'Légumes',
+        n: 'Carottes',
+        q: '500',
+        u: 'g',
+        notes: 'bio',
+        r: '100',
+        isChecked: false,
+      },
+      {
+        id: '2',
+        cat: 'Légumes',
+        n: 'Courgettes',
+        q: '3',
+        u: 'pièces',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+      {
+        id: '3',
+        cat: 'Céréales',
+        n: 'Quinoa',
+        q: '250',
+        u: 'g',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+      {
+        id: '4',
+        cat: 'Épicerie',
+        n: 'Lait de coco',
+        q: '400',
+        u: 'ml',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+    ],
   },
   {
     id: '2',
@@ -56,19 +94,55 @@ const menus = [
     recipes: [
       'Pâtes aux tomates cerises et basilic',
       'Salade grecque',
-      'Houmous maison'
+      'Houmous maison',
     ],
     tags: ['Végétarien'],
     season: 'Été',
     isPremium: false,
     servings: 4,
     ingredients: [
-      { id: '5', cat: 'Légumes', n: 'Tomates cerises', q: '500', u: 'g', notes: '', r: '0', isChecked: false },
-      { id: '6', cat: 'Légumes', n: 'Concombre', q: '1', u: 'pièce', notes: '', r: '0', isChecked: false },
-      { id: '7', cat: 'Épicerie', n: 'Pâtes', q: '500', u: 'g', notes: '', r: '0', isChecked: false },
-      { id: '8', cat: 'Produits Laitiers', n: 'Feta', q: '200', u: 'g', notes: '', r: '0', isChecked: false }
-    ]
-  }
+      {
+        id: '5',
+        cat: 'Légumes',
+        n: 'Tomates cerises',
+        q: '500',
+        u: 'g',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+      {
+        id: '6',
+        cat: 'Légumes',
+        n: 'Concombre',
+        q: '1',
+        u: 'pièce',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+      {
+        id: '7',
+        cat: 'Épicerie',
+        n: 'Pâtes',
+        q: '500',
+        u: 'g',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+      {
+        id: '8',
+        cat: 'Produits Laitiers',
+        n: 'Feta',
+        q: '200',
+        u: 'g',
+        notes: '',
+        r: '0',
+        isChecked: false,
+      },
+    ],
+  },
 ];
 
 export default function DiscoveryScreen() {
@@ -82,66 +156,99 @@ export default function DiscoveryScreen() {
   const themeColors = styles.getThemeColors(colorScheme);
 
   // Get plan store actions
-  const { 
-    setSelectedPlan, 
-    loadIngredientsFromPlan, 
-    selectedPlanId 
-  } = usePlanStore();
+  const { setSelectedPlan, loadIngredientsFromPlan, selectedPlanId } =
+    usePlanStore();
+
+  // Add the batch cooking hook
+  const {
+    activePlanId,
+    activatePlan,
+    isLoading: isActivatingPlan,
+  } = useBatchCooking();
 
   const toggleDiet = (diet) => {
-    setSelectedDiets(prev => 
-      prev.includes(diet) 
-        ? prev.filter(d => d !== diet)
-        : [...prev, diet]
+    setSelectedDiets((prev) =>
+      prev.includes(diet) ? prev.filter((d) => d !== diet) : [...prev, diet]
     );
   };
 
-  const handlePlanSelection = (menu) => {
-    // If a plan is already selected, ask for confirmation
-    if (selectedPlanId) {
-      Alert.alert(
-        'Change Menu Plan?',
-        'Selecting a new menu will replace your current shopping list. Do you want to continue?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Continue',
-            style: 'destructive',
-            onPress: () => {
-              setSelectedPlan(menu.id);
-              loadIngredientsFromPlan(menu.ingredients);
-              Alert.alert('Success', 'Shopping list updated with the new menu plan');
-            },
-          },
-        ]
-      );
-    } else {
-      setSelectedPlan(menu.id);
-      loadIngredientsFromPlan(menu.ingredients);
-      Alert.alert('Success', 'Shopping list created from the selected menu plan');
-    }
+  // Create a helper function to check if a menu is selected in either store
+  const isMenuSelected = (menuId) => {
+    return selectedPlanId === menuId || activePlanId === menuId;
   };
+
+// app/[tabs]/index.tsx (handlePlanSelection function update)
+const handlePlanSelection = (menu) => {
+  // Combined plan ID check from both stores
+  const hasActivePlan = selectedPlanId !== null || activePlanId !== null;
+  
+  if (hasActivePlan) {
+    Alert.alert(
+      'Change Menu Plan?',
+      'Selecting a new menu will replace your current plan and shopping list. Do you want to continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Clear previous plan first
+              setSelectedPlan(null);
+              
+              // Then set the new plan
+              setTimeout(() => {
+                setSelectedPlan(menu.id);
+                loadIngredientsFromPlan(menu.ingredients);
+                
+                // Try to activate in batch cooking system
+                activatePlan(menu.id).then(success => {
+                  if (success) {
+                    Alert.alert('Success', 'Menu plan updated!');
+                  }
+                });
+              }, 100);
+            } catch (error) {
+              console.error('Failed to update plan:', error);
+              Alert.alert('Error', 'Failed to update the menu plan. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  } else {
+    // Update both stores when no plan is active
+    setSelectedPlan(menu.id);
+    loadIngredientsFromPlan(menu.ingredients);
+    
+    activatePlan(menu.id).then(success => {
+      if (success) {
+        Alert.alert('Success', 'Menu plan activated!');
+      }
+    });
+  }
+};
 
   const renderMenuCard = ({ item }) => (
     <TouchableOpacity
       style={[
         localStyles.menuCard,
         isDark && localStyles.menuCardDark,
-        selectedPlanId === item.id && localStyles.selectedMenuCard
+        isMenuSelected(item.id) && localStyles.selectedMenuCard,
       ]}
-      onPress={() => setSelectedMenu(item)}>
-      <Image
-        source={{ uri: item.image }}
-        style={localStyles.menuImage}
-      />
+      onPress={() => setSelectedMenu(item)}
+    >
+      <Image source={{ uri: item.image }} style={localStyles.menuImage} />
       <View style={localStyles.badgeContainer}>
-        <View style={[
-          localStyles.badge,
-          item.isPremium ? localStyles.premiumBadge : localStyles.freeBadge
-        ]}>
+        <View
+          style={[
+            localStyles.badge,
+            item.isPremium ? localStyles.premiumBadge : localStyles.freeBadge,
+          ]}
+        >
           <Text style={localStyles.badgeText}>
             {item.isPremium ? 'Premium' : 'Gratuit'}
           </Text>
@@ -150,14 +257,16 @@ export default function DiscoveryScreen() {
           <Ionicons name="time-outline" size={14} color="#FFFFFF" />
           <Text style={localStyles.badgeText}>{item.timeInvestment}</Text>
         </View>
-        {selectedPlanId === item.id && (
+        {isMenuSelected(item.id) && (
           <View style={localStyles.selectedBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
             <Text style={localStyles.badgeText}>Selected</Text>
           </View>
         )}
       </View>
-      <View style={[localStyles.cardContent, isDark && localStyles.cardContentDark]}>
+      <View
+        style={[localStyles.cardContent, isDark && localStyles.cardContentDark]}
+      >
         <Text style={[localStyles.menuTitle, isDark && localStyles.textLight]}>
           {item.title}
         </Text>
@@ -168,13 +277,16 @@ export default function DiscoveryScreen() {
             </View>
           ))}
         </View>
-        <Text style={[localStyles.recipesTitle, isDark && localStyles.textLight]}>
+        <Text
+          style={[localStyles.recipesTitle, isDark && localStyles.textLight]}
+        >
           Recettes incluses:
         </Text>
         {item.recipes.map((recipe, index) => (
-          <Text 
+          <Text
             key={index}
-            style={[localStyles.recipeItem, isDark && localStyles.textLight]}>
+            style={[localStyles.recipeItem, isDark && localStyles.textLight]}
+          >
             • {recipe}
           </Text>
         ))}
@@ -183,70 +295,97 @@ export default function DiscoveryScreen() {
   );
 
   return (
-    <SafeAreaView style={[localStyles.container, isDark && localStyles.containerDark]}>
+    <SafeAreaView
+      style={[localStyles.container, isDark && localStyles.containerDark]}
+    >
       <View style={localStyles.header}>
         <Text style={[localStyles.title, isDark && localStyles.textLight]}>
           Découvrez nos menus
         </Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={localStyles.filtersContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={localStyles.filtersContainer}
+      >
         {seasons.map((season) => (
           <TouchableOpacity
             key={season}
             style={[
               localStyles.filterChip,
               selectedSeason === season && localStyles.filterChipActive,
-              isDark && localStyles.filterChipDark
+              isDark && localStyles.filterChipDark,
             ]}
-            onPress={() => setSelectedSeason(prev => prev === season ? null : season)}>
-            <Text style={[
-              localStyles.filterText,
-              selectedSeason === season && localStyles.filterTextActive,
-              isDark && localStyles.textLight
-            ]}>
+            onPress={() =>
+              setSelectedSeason((prev) => (prev === season ? null : season))
+            }
+          >
+            <Text
+              style={[
+                localStyles.filterText,
+                selectedSeason === season && localStyles.filterTextActive,
+                isDark && localStyles.textLight,
+              ]}
+            >
               {season}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={localStyles.filtersContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={localStyles.filtersContainer}
+      >
         {dietaryOptions.map((diet) => (
           <TouchableOpacity
             key={diet}
             style={[
               localStyles.filterChip,
               selectedDiets.includes(diet) && localStyles.filterChipActive,
-              isDark && localStyles.filterChipDark
+              isDark && localStyles.filterChipDark,
             ]}
-            onPress={() => toggleDiet(diet)}>
-            <Text style={[
-              localStyles.filterText,
-              selectedDiets.includes(diet) && localStyles.filterTextActive,
-              isDark && localStyles.textLight
-            ]}>
+            onPress={() => toggleDiet(diet)}
+          >
+            <Text
+              style={[
+                localStyles.filterText,
+                selectedDiets.includes(diet) && localStyles.filterTextActive,
+                isDark && localStyles.textLight,
+              ]}
+            >
               {diet}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={localStyles.filtersContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={localStyles.filtersContainer}
+      >
         {timeFilters.map((time) => (
           <TouchableOpacity
             key={time}
             style={[
               localStyles.filterChip,
               selectedTime === time && localStyles.filterChipActive,
-              isDark && localStyles.filterChipDark
+              isDark && localStyles.filterChipDark,
             ]}
-            onPress={() => setSelectedTime(prev => prev === time ? null : time)}>
-            <Text style={[
-              localStyles.filterText,
-              selectedTime === time && localStyles.filterTextActive,
-              isDark && localStyles.textLight
-            ]}>
+            onPress={() =>
+              setSelectedTime((prev) => (prev === time ? null : time))
+            }
+          >
+            <Text
+              style={[
+                localStyles.filterText,
+                selectedTime === time && localStyles.filterTextActive,
+                isDark && localStyles.textLight,
+              ]}
+            >
               {time}
             </Text>
           </TouchableOpacity>
@@ -256,7 +395,7 @@ export default function DiscoveryScreen() {
       <FlatList
         data={menus}
         renderItem={renderMenuCard}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={localStyles.menuList}
       />
 
@@ -264,12 +403,19 @@ export default function DiscoveryScreen() {
         visible={selectedMenu !== null}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setSelectedMenu(null)}>
+        onRequestClose={() => setSelectedMenu(null)}
+      >
         <View style={localStyles.modalOverlay}>
-          <View style={[localStyles.modalContent, isDark && localStyles.modalContentDark]}>
+          <View
+            style={[
+              localStyles.modalContent,
+              isDark && localStyles.modalContentDark,
+            ]}
+          >
             <TouchableOpacity
               style={localStyles.closeButton}
-              onPress={() => setSelectedMenu(null)}>
+              onPress={() => setSelectedMenu(null)}
+            >
               <Ionicons
                 name="close"
                 size={24}
@@ -285,21 +431,32 @@ export default function DiscoveryScreen() {
                 />
 
                 <View style={localStyles.modalHeader}>
-                  <Text style={[localStyles.modalTitle, isDark && localStyles.textLight]}>
+                  <Text
+                    style={[
+                      localStyles.modalTitle,
+                      isDark && localStyles.textLight,
+                    ]}
+                  >
                     {selectedMenu.title}
                   </Text>
                   <View style={localStyles.modalBadges}>
-                    <View style={[
-                      localStyles.badge,
-                      selectedMenu.isPremium ? localStyles.premiumBadge : localStyles.freeBadge
-                    ]}>
+                    <View
+                      style={[
+                        localStyles.badge,
+                        selectedMenu.isPremium
+                          ? localStyles.premiumBadge
+                          : localStyles.freeBadge,
+                      ]}
+                    >
                       <Text style={localStyles.badgeText}>
                         {selectedMenu.isPremium ? 'Premium' : 'Gratuit'}
                       </Text>
                     </View>
                     <View style={localStyles.timeBadge}>
                       <Ionicons name="time-outline" size={14} color="#FFFFFF" />
-                      <Text style={localStyles.badgeText}>{selectedMenu.timeInvestment}</Text>
+                      <Text style={localStyles.badgeText}>
+                        {selectedMenu.timeInvestment}
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -310,12 +467,15 @@ export default function DiscoveryScreen() {
                       localStyles.tabButton,
                       activeTab === 'overview' && localStyles.activeTab,
                     ]}
-                    onPress={() => setActiveTab('overview')}>
-                    <Text style={[
-                      localStyles.tabButtonText,
-                      activeTab === 'overview' && localStyles.activeTabText,
-                      isDark && localStyles.textLight
-                    ]}>
+                    onPress={() => setActiveTab('overview')}
+                  >
+                    <Text
+                      style={[
+                        localStyles.tabButtonText,
+                        activeTab === 'overview' && localStyles.activeTabText,
+                        isDark && localStyles.textLight,
+                      ]}
+                    >
                       Aperçu
                     </Text>
                   </TouchableOpacity>
@@ -324,12 +484,16 @@ export default function DiscoveryScreen() {
                       localStyles.tabButton,
                       activeTab === 'ingredients' && localStyles.activeTab,
                     ]}
-                    onPress={() => setActiveTab('ingredients')}>
-                    <Text style={[
-                      localStyles.tabButtonText,
-                      activeTab === 'ingredients' && localStyles.activeTabText,
-                      isDark && localStyles.textLight
-                    ]}>
+                    onPress={() => setActiveTab('ingredients')}
+                  >
+                    <Text
+                      style={[
+                        localStyles.tabButtonText,
+                        activeTab === 'ingredients' &&
+                          localStyles.activeTabText,
+                        isDark && localStyles.textLight,
+                      ]}
+                    >
                       Ingrédients
                     </Text>
                   </TouchableOpacity>
@@ -338,24 +502,51 @@ export default function DiscoveryScreen() {
                 {activeTab === 'overview' ? (
                   <View style={localStyles.tabContent}>
                     <View style={localStyles.infoRow}>
-                      <Ionicons name="people-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                      <Text style={[localStyles.infoText, isDark && localStyles.textLight]}>
+                      <Ionicons
+                        name="people-outline"
+                        size={20}
+                        color={isDark ? '#FFFFFF' : '#000000'}
+                      />
+                      <Text
+                        style={[
+                          localStyles.infoText,
+                          isDark && localStyles.textLight,
+                        ]}
+                      >
                         {selectedMenu.servings} portions
                       </Text>
                     </View>
                     <View style={localStyles.infoRow}>
-                      <Ionicons name="time-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                      <Text style={[localStyles.infoText, isDark && localStyles.textLight]}>
+                      <Ionicons
+                        name="time-outline"
+                        size={20}
+                        color={isDark ? '#FFFFFF' : '#000000'}
+                      />
+                      <Text
+                        style={[
+                          localStyles.infoText,
+                          isDark && localStyles.textLight,
+                        ]}
+                      >
                         Temps total: {selectedMenu.timeInvestment}
                       </Text>
                     </View>
-                    <Text style={[localStyles.sectionTitle, isDark && localStyles.textLight]}>
+                    <Text
+                      style={[
+                        localStyles.sectionTitle,
+                        isDark && localStyles.textLight,
+                      ]}
+                    >
                       Recettes incluses:
                     </Text>
                     {selectedMenu.recipes.map((recipe, index) => (
-                      <Text 
+                      <Text
                         key={index}
-                        style={[localStyles.recipeItem, isDark && localStyles.textLight]}>
+                        style={[
+                          localStyles.recipeItem,
+                          isDark && localStyles.textLight,
+                        ]}
+                      >
                         • {recipe}
                       </Text>
                     ))}
@@ -369,14 +560,26 @@ export default function DiscoveryScreen() {
                         return acc;
                       }, {})
                     ).map(([category, items]) => (
-                      <View key={category} style={localStyles.ingredientCategory}>
-                        <Text style={[localStyles.categoryTitle, isDark && localStyles.textLight]}>
+                      <View
+                        key={category}
+                        style={localStyles.ingredientCategory}
+                      >
+                        <Text
+                          style={[
+                            localStyles.categoryTitle,
+                            isDark && localStyles.textLight,
+                          ]}
+                        >
                           {category}
                         </Text>
                         {items.map((item, index) => (
-                          <Text 
+                          <Text
                             key={index}
-                            style={[localStyles.ingredientItem, isDark && localStyles.textLight]}>
+                            style={[
+                              localStyles.ingredientItem,
+                              isDark && localStyles.textLight,
+                            ]}
+                          >
                             • {item.n} ({item.q} {item.u})
                           </Text>
                         ))}
@@ -388,17 +591,22 @@ export default function DiscoveryScreen() {
                 <TouchableOpacity
                   style={[
                     localStyles.selectButton,
-                    selectedPlanId === selectedMenu.id && localStyles.selectedButton
+                    isMenuSelected(selectedMenu.id) &&
+                      localStyles.selectedButton,
+                    isActivatingPlan && { opacity: 0.7 },
                   ]}
                   onPress={() => {
                     handlePlanSelection(selectedMenu);
                     setSelectedMenu(null);
-                  }}>
+                  }}
+                  disabled={isActivatingPlan}
+                >
                   <Text style={localStyles.selectButtonText}>
-                    {selectedPlanId === selectedMenu.id 
+                    {isActivatingPlan
+                      ? 'CHARGEMENT...'
+                      : isMenuSelected(selectedMenu.id)
                       ? 'PLAN SÉLECTIONNÉ'
-                      : 'SÉLECTIONNER CE PLAN'
-                    }
+                      : 'SÉLECTIONNER CE PLAN'}
                   </Text>
                 </TouchableOpacity>
 
@@ -408,7 +616,8 @@ export default function DiscoveryScreen() {
                     onPress={() => {
                       // Handle customization
                       setSelectedMenu(null);
-                    }}>
+                    }}
+                  >
                     <Text style={localStyles.customizeButtonText}>
                       Créer mon plan personnalisé
                     </Text>
