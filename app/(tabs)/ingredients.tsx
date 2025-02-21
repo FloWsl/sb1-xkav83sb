@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
 import type { ShoppingListItem } from '../../types/schema';
 import styles from '../../styles';
 import { usePlanStore } from '../../store/planStore';
@@ -35,6 +37,7 @@ export default function IngredientsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = styles.getThemeColors(colorScheme);
+  const router = useRouter();
 
   // Get store actions and state
   const { 
@@ -77,7 +80,7 @@ export default function IngredientsScreen() {
       .join('\n');
 
     await Clipboard.setStringAsync(text);
-    Alert.alert('Success', 'Shopping list copied to clipboard');
+    Alert.alert('Succès', 'Liste de courses copiée dans le presse-papier');
   }, [ingredients]);
 
   // Filter items based on search
@@ -97,16 +100,16 @@ export default function IngredientsScreen() {
             color={themeColors.primary}
           />
           <Text style={[localStyles.premiumTitle, isDark && localStyles.textLight]}>
-            Premium Feature
+            Fonctionnalité Premium
           </Text>
           <Text style={[localStyles.premiumText, isDark && localStyles.textLight]}>
-            Upgrade to Premium to access the smart shopping list with automatic organization and offline sync.
+            Passez à la version Premium pour accéder à la liste de courses intelligente avec organisation automatique et synchronisation hors ligne.
           </Text>
           <TouchableOpacity
             style={localStyles.upgradeButton}
             onPress={() => {/* Handle upgrade */}}>
             <Text style={localStyles.upgradeButtonText}>
-              Upgrade to Premium
+              Passer à la version Premium
             </Text>
           </TouchableOpacity>
         </View>
@@ -119,13 +122,20 @@ export default function IngredientsScreen() {
       <SafeAreaView style={[localStyles.container, isDark && localStyles.containerDark]}>
         <View style={localStyles.emptyState}>
           <Ionicons
-            name="nutrition-outline"
+            name="basket-outline"
             size={48}
             color={themeColors.primary}
           />
           <Text style={[localStyles.emptyStateText, isDark && localStyles.textLight]}>
-            Select a meal plan from the Discovery tab to see your shopping list
+            Sélectionnez un plan de repas dans l'onglet Découverte pour voir votre liste de courses
           </Text>
+          <TouchableOpacity
+            style={localStyles.browseButton}
+            onPress={() => router.replace('/')}>
+            <Text style={localStyles.browseButtonText}>
+              PARCOURIR LES PLANS
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -135,7 +145,7 @@ export default function IngredientsScreen() {
     <SafeAreaView style={[localStyles.container, isDark && localStyles.containerDark]}>
       <View style={localStyles.header}>
         <Text style={[localStyles.title, isDark && localStyles.textLight]}>
-          Shopping List
+          Liste de courses
         </Text>
         <TouchableOpacity
           style={localStyles.copyButton}
@@ -156,7 +166,7 @@ export default function IngredientsScreen() {
         />
         <TextInput
           style={[localStyles.searchInput, isDark && localStyles.searchInputDark]}
-          placeholder="Search ingredients..."
+          placeholder="Rechercher des ingrédients..."
           placeholderTextColor={isDark ? '#888888' : '#666666'}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -171,13 +181,13 @@ export default function IngredientsScreen() {
             color={themeColors.primary}
           />
           <Text style={[localStyles.emptyStateText, isDark && localStyles.textLight]}>
-            Your shopping list is empty
+            Votre liste de courses est vide
           </Text>
           <TouchableOpacity
             style={localStyles.addButton}
             onPress={() => setShowAddItem(true)}>
             <Text style={localStyles.addButtonText}>
-              Add Custom Item
+              Ajouter un article
             </Text>
           </TouchableOpacity>
         </View>
@@ -242,18 +252,18 @@ export default function IngredientsScreen() {
         <View style={[localStyles.addItemModal, isDark && localStyles.addItemModalDark]}>
           <View style={[localStyles.modalContent, isDark && localStyles.modalContentDark]}>
             <Text style={[localStyles.modalTitle, isDark && localStyles.textLight]}>
-              Add Custom Item
+              Ajouter un article
             </Text>
             <TextInput
               style={[localStyles.modalInput, isDark && localStyles.modalInputDark]}
-              placeholder="Item name"
+              placeholder="Nom de l'article"
               placeholderTextColor={isDark ? '#888888' : '#666666'}
               value={newItemName}
               onChangeText={setNewItemName}
             />
             <TextInput
               style={[localStyles.modalInput, isDark && localStyles.modalInputDark]}
-              placeholder="Category (e.g., Produce, Dairy)"
+              placeholder="Catégorie (ex: Légumes, Produits laitiers)"
               placeholderTextColor={isDark ? '#888888' : '#666666'}
               value={newItemCategory}
               onChangeText={setNewItemCategory}
@@ -266,12 +276,12 @@ export default function IngredientsScreen() {
                   setNewItemName('');
                   setNewItemCategory('');
                 }}>
-                <Text style={localStyles.cancelButtonText}>Cancel</Text>
+                <Text style={localStyles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[localStyles.modalButton, localStyles.addButton]}
                 onPress={addCustomItem}>
-                <Text style={localStyles.addButtonText}>Add Item</Text>
+                <Text style={localStyles.addButtonText}>Ajouter</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -526,6 +536,17 @@ const localStyles = StyleSheet.create({
   },
   upgradeButtonText: {
     color: '#000000',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  browseButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  browseButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
