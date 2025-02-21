@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ShoppingListItem } from '../types/schema';
+import type { ShoppingListItem, Recipe, Equipment } from '../types/schema';
 
 // VERY aggressive JSON cloning - guarantees no Symbols or non-serializable data
 const safeClone = (obj: any): any => {
@@ -60,7 +60,9 @@ const customSerializer = {
       console.error('Serialization error:', error);
       return JSON.stringify({
         selectedPlanId: null,
-        ingredients: []
+        ingredients: [],
+        recipes: [],
+        equipment: []
       });
     }
   },
@@ -77,7 +79,9 @@ const customSerializer = {
       console.error('Deserialization error:', error);
       return {
         selectedPlanId: null,
-        ingredients: []
+        ingredients: [],
+        recipes: [],
+        equipment: []
       };
     }
   }
@@ -86,11 +90,15 @@ const customSerializer = {
 interface PlanStore {
   selectedPlanId: string | null;
   ingredients: ShoppingListItem[];
+  recipes: Recipe[];
+  equipment: Equipment[];
   setSelectedPlan: (planId: string | null) => void;
   addIngredient: (ingredient: ShoppingListItem) => void;
   toggleIngredient: (id: string) => void;
   loadIngredientsFromPlan: (ingredients: ShoppingListItem[]) => void;
-  clearIngredients: () => void;
+  loadRecipesFromPlan: (recipes: Recipe[]) => void;
+  loadEquipmentFromPlan: (equipment: Equipment[]) => void;
+  clearPlanData: () => void;
 }
 
 export const usePlanStore = create<PlanStore>()(
@@ -98,6 +106,8 @@ export const usePlanStore = create<PlanStore>()(
     (set) => ({
       selectedPlanId: null,
       ingredients: [],
+      recipes: [],
+      equipment: [],
       setSelectedPlan: (planId) => {
         console.log("Setting selected plan in store:", planId);
         set({ selectedPlanId: planId });
@@ -118,9 +128,24 @@ export const usePlanStore = create<PlanStore>()(
         const safeIngredients = safeClone(ingredients);
         set({ ingredients: safeIngredients });
       },
-      clearIngredients: () => {
-        console.log("Clearing ingredients in store");
-        set({ ingredients: [] });
+      loadRecipesFromPlan: (recipes) => {
+        console.log("Loading recipes in store:", recipes.length);
+        const safeRecipes = safeClone(recipes);
+        set({ recipes: safeRecipes });
+      },
+      loadEquipmentFromPlan: (equipment) => {
+        console.log("Loading equipment in store:", equipment.length);
+        const safeEquipment = safeClone(equipment);
+        set({ equipment: safeEquipment });
+      },
+      clearPlanData: () => {
+        console.log("Clearing all plan data in store");
+        set({ 
+          selectedPlanId: null,
+          ingredients: [],
+          recipes: [],
+          equipment: []
+        });
       },
     }),
     {
@@ -162,3 +187,4 @@ export const usePlanStore = create<PlanStore>()(
     }
   )
 );
+

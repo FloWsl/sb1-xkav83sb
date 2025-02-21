@@ -12,6 +12,7 @@ import {
   FlatList,
   useColorScheme,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { dummyMenus, dummyShoppingItems } from '../../lib/dummyData';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -105,23 +106,25 @@ export default function DiscoveryScreen() {
   };
 
   // Handle plan selection or deselection
-  const handlePlanSelection = async (menu) => {
-    // If there's a plan already selected
-    if (isMenuSelected(menu.id)) {
-      try {
-        // Show confirmation dialog
-        Alert.alert(
-          'Désactiver le plan',
-          'Voulez-vous vraiment désactiver ce plan ? Votre progression sera perdue.',
-          [
-            {
-              text: 'Annuler',
-              style: 'cancel'
-            },
-            {
-              text: 'Désactiver',
-              style: 'destructive',
-              onPress: async () => {
+ const handlePlanSelection = async (menu) => {
+  // If there's a plan already selected
+  if (isMenuSelected(menu.id)) {
+    try {
+      // Show confirmation dialog
+      Alert.alert(
+        'Désactiver le plan',
+        'Voulez-vous vraiment désactiver ce plan ? Votre progression sera perdue.',
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          },
+          {
+            text: 'Désactiver',
+            style: 'destructive',
+            onPress: async () => {
+              setIsLoading(true);
+              try {
                 // First clear the batch cooking state
                 await clearActivePlan();
                 console.log("Cleared batch cooking state");
@@ -132,72 +135,7 @@ export default function DiscoveryScreen() {
                 console.log("Cleared plan store state");
                 
                 Alert.alert('Succès', 'Le plan a été désactivé.');
-              }
-            }
-          ]
-        );
-      } catch (error) {
-        console.error('Failed to deactivate plan:', error);
-        Alert.alert('Erreur', 'Impossible de désactiver le plan. Veuillez réessayer.');
-      }
-      return;
-    }
-    
-    // If we're activating a new plan
-    try {
-      // Show confirmation dialog
-      Alert.alert(
-        'Activer le plan',
-        'Voulez-vous activer ce plan de batch cooking ?',
-        [
-          {
-            text: 'Annuler',
-            style: 'cancel'
-          },
-          {
-            text: 'Activer',
-            onPress: async () => {
-              setIsLoading(true);
-              
-              try {
-                // First clear any existing plan
-                if (activePlanId || selectedPlanId) {
-                  await clearActivePlan();
-                  clearIngredients();
-                  setSelectedPlan(null);
-                  console.log("Cleared previous plan");
-                }
-                
-                // Then activate the new plan
-                console.log("Setting new plan:", menu.id);
-                
-                // First activate the batch cooking plan
-                const success = await activatePlan(menu.id);
-                console.log("Updated batch cooking state:", success);
-                
-                if (success) {
-                  // Then update the plan store
-                  setSelectedPlan(menu.id);
-                  loadIngredientsFromPlan(menu.ingredients);
-                  console.log("Updated plan store");
-                  
-                  Alert.alert(
-                    'Succès',
-                    'Le plan a été activé ! Vous pouvez maintenant accéder aux instructions dans l\'onglet Cooking.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: () => {
-                          // Close the modal if open
-                          setSelectedMenu(null);
-                        }
-                      }
-                    ]
-                  );
-                }
-              } catch (error) {
-                console.error('Failed to activate plan:', error);
-                Alert.alert('Erreur', 'Impossible d\'activer le plan. Veuillez réessayer.');
+                setSelectedMenu(null); // Close the modal
               } finally {
                 setIsLoading(false);
               }
@@ -206,10 +144,91 @@ export default function DiscoveryScreen() {
         ]
       );
     } catch (error) {
-      console.error('Failed to show activation dialog:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+      console.error('Failed to deactivate plan:', error);
+      Alert.alert('Erreur', 'Impossible de désactiver le plan. Veuillez réessayer.');
     }
-  };
+    return;
+  }
+  
+  // If we're activating a new plan
+  try {
+    // Show confirmation dialog
+    Alert.alert(
+      'Activer le plan',
+      isMenuSelected(null) 
+        ? 'Voulez-vous activer ce plan de batch cooking ?'
+        : 'Un autre plan est déjà actif. Voulez-vous le remplacer par celui-ci ?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        },
+        {
+          text: 'Activer',
+          onPress: async () => {
+            setIsLoading(true);
+            
+            try {
+              // First clear any existing plan
+              if (activePlanId || selectedPlanId) {
+                await clearActivePlan();
+                clearIngredients();
+                setSelectedPlan(null);
+                console.log("Cleared previous plan");
+              }
+              
+              // Then activate the new plan
+              console.log("Setting new plan:", menu.id);
+              
+              // First activate the batch cooking plan
+              const success = await activatePlan(menu.id);
+              console.log("Updated batch cooking state:", success);
+              
+              if (success) {
+                // Then update the plan store with all plan data
+                setSelectedPlan(menu.id);
+                loadIngredientsFromPlan(menu.ingredients);
+                
+                // Get the plan data from the API
+                const planData = await API.fetchPlanById(menu.id);
+                if (planData) {
+                  // Load recipes and equipment
+                  loadRecipesFromPlan(planData.r);
+                  loadEquipmentFromPlan(planData.e);
+                }
+                
+                console.log("Updated plan store");
+                
+                Alert.alert(
+                  'Succès',
+                  'Le plan a été activé ! Vous pouvez maintenant accéder aux instructions dans l\'onglet Cooking.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Close the modal if open
+                        setSelectedMenu(null);
+                      }
+                    }
+                  ]
+                );
+              }
+            } catch (error) {
+              console.error('Failed to activate plan:', error);
+              Alert.alert('Erreur', 'Impossible d\'activer le plan. Veuillez réessayer.');
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  } catch (error) {
+    console.error('Failed to show activation dialog:', error);
+    Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+  }
+};
+
 
   const renderMenuCard = ({ item }) => (
     <TouchableOpacity
@@ -272,6 +291,19 @@ export default function DiscoveryScreen() {
       </View>
     </TouchableOpacity>
   );
+
+  if (isLoading || isActivatingPlan) {
+    return (
+      <SafeAreaView style={[localStyles.container, isDark && localStyles.containerDark]}>
+        <View style={localStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={themeColors.primary} />
+          <Text style={[localStyles.loadingText, isDark && localStyles.textLight]}>
+            {isMenuSelected(null) ? 'Activation du plan...' : 'Désactivation du plan...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -571,17 +603,16 @@ export default function DiscoveryScreen() {
                     style={[
                       localStyles.selectButton,
                       isMenuSelected(selectedMenu.id) && localStyles.selectedButton,
-                      isActivatingPlan && { opacity: 0.7 },
+                      (isLoading || isActivatingPlan) && { opacity: 0.7 },
                     ]}
                     onPress={() => {
                       console.log("Plan selection button pressed for:", selectedMenu.id);
                       handlePlanSelection(selectedMenu);
-                      setSelectedMenu(null);
                     }}
-                    disabled={isActivatingPlan}
+                    disabled={isLoading || isActivatingPlan}
                   >
                     <Text style={localStyles.selectButtonText}>
-                      {isActivatingPlan
+                      {isLoading || isActivatingPlan
                         ? 'CHARGEMENT...'
                         : isMenuSelected(selectedMenu.id)
                         ? 'DÉSACTIVER CE PLAN'
@@ -880,5 +911,15 @@ const localStyles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
