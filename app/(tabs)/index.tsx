@@ -1,5 +1,5 @@
 // app/[tabs]/index.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   useColorScheme,
   Alert,
 } from 'react-native';
+import { dummyMenus, dummyShoppingItems } from '../../lib/dummyData';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../../styles';
@@ -28,122 +29,24 @@ const dietaryOptions = ['Végétarien', 'Sans Gluten', 'Low-Carb', 'Vegan'];
 const timeFilters = ['1-2h', '2-3h', '3h+'];
 
 // Sample menu data
-const menus = [
-  {
-    id: '1',
-    title: 'Menu Végétarien de Printemps',
-    image: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800',
-    timeInvestment: '2h30',
-    recipes: [
-      'Salade de quinoa aux légumes printaniers',
-      'Curry de légumes au lait de coco',
-      'Buddha bowl aux légumes rôtis',
-    ],
-    tags: ['Végétarien', 'Sans Gluten'],
-    season: 'Printemps',
-    isPremium: true,
+const menus = dummyMenus.map(menu => {
+  // For display in the UI, we need to add a few properties
+  return {
+    ...menu,
+    id: menu.id,
+    title: menu.title,
+    image: menu.imageUrl,
+    timeInvestment: menu.timeEstimate,
+    recipes: ['Recette 1', 'Recette 2', 'Recette 3'], // Sample recipes list
+    tags: menu.tags,
+    season: menu.tags.includes('Printemps') ? 'Printemps' : 
+            menu.tags.includes('Été') ? 'Été' :
+            menu.tags.includes('Automne') ? 'Automne' : 'Hiver',
+    isPremium: menu.isPremium,
     servings: 4,
-    ingredients: [
-      {
-        id: '1',
-        cat: 'Légumes',
-        n: 'Carottes',
-        q: '500',
-        u: 'g',
-        notes: 'bio',
-        r: '100',
-        isChecked: false,
-      },
-      {
-        id: '2',
-        cat: 'Légumes',
-        n: 'Courgettes',
-        q: '3',
-        u: 'pièces',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-      {
-        id: '3',
-        cat: 'Céréales',
-        n: 'Quinoa',
-        q: '250',
-        u: 'g',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-      {
-        id: '4',
-        cat: 'Épicerie',
-        n: 'Lait de coco',
-        q: '400',
-        u: 'ml',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Menu Express Méditerranéen',
-    image: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800',
-    timeInvestment: '1h45',
-    recipes: [
-      'Pâtes aux tomates cerises et basilic',
-      'Salade grecque',
-      'Houmous maison',
-    ],
-    tags: ['Végétarien'],
-    season: 'Été',
-    isPremium: false,
-    servings: 4,
-    ingredients: [
-      {
-        id: '5',
-        cat: 'Légumes',
-        n: 'Tomates cerises',
-        q: '500',
-        u: 'g',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-      {
-        id: '6',
-        cat: 'Légumes',
-        n: 'Concombre',
-        q: '1',
-        u: 'pièce',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-      {
-        id: '7',
-        cat: 'Épicerie',
-        n: 'Pâtes',
-        q: '500',
-        u: 'g',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-      {
-        id: '8',
-        cat: 'Produits Laitiers',
-        n: 'Feta',
-        q: '200',
-        u: 'g',
-        notes: '',
-        r: '0',
-        isChecked: false,
-      },
-    ],
-  },
-];
+    ingredients: dummyShoppingItems[menu.id] || []
+  };
+});
 
 export default function DiscoveryScreen() {
   const [selectedMenu, setSelectedMenu] = useState(null);
@@ -151,20 +54,44 @@ export default function DiscoveryScreen() {
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [selectedDiets, setSelectedDiets] = useState([]);
   const [selectedTime, setSelectedTime] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = styles.getThemeColors(colorScheme);
 
   // Get plan store actions
-  const { setSelectedPlan, loadIngredientsFromPlan, selectedPlanId } =
+  const { setSelectedPlan, loadIngredientsFromPlan, selectedPlanId, clearIngredients } =
     usePlanStore();
 
   // Add the batch cooking hook
   const {
     activePlanId,
     activatePlan,
+    clearActivePlan,
     isLoading: isActivatingPlan,
   } = useBatchCooking();
+
+  // Sync state between stores when component mounts
+  useEffect(() => {
+    const syncStoresState = async () => {
+      // If batchCooking has an active plan but planStore doesn't, update planStore
+      if (activePlanId && !selectedPlanId) {
+        const plan = menus.find(m => m.id === activePlanId);
+        if (plan) {
+          console.log('Syncing from batchCooking to planStore:', activePlanId);
+          setSelectedPlan(activePlanId);
+          loadIngredientsFromPlan(plan.ingredients);
+        }
+      } 
+      // If planStore has a selected plan but batchCooking doesn't, update batchCooking
+      else if (selectedPlanId && !activePlanId) {
+        console.log('Syncing from planStore to batchCooking:', selectedPlanId);
+        await activatePlan(selectedPlanId);
+      }
+    };
+
+    syncStoresState();
+  }, [activePlanId, selectedPlanId]);
 
   const toggleDiet = (diet) => {
     setSelectedDiets((prev) =>
@@ -177,60 +104,112 @@ export default function DiscoveryScreen() {
     return selectedPlanId === menuId || activePlanId === menuId;
   };
 
-// app/[tabs]/index.tsx (handlePlanSelection function update)
-const handlePlanSelection = (menu) => {
-  // Combined plan ID check from both stores
-  const hasActivePlan = selectedPlanId !== null || activePlanId !== null;
-  
-  if (hasActivePlan) {
-    Alert.alert(
-      'Change Menu Plan?',
-      'Selecting a new menu will replace your current plan and shopping list. Do you want to continue?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Clear previous plan first
-              setSelectedPlan(null);
-              
-              // Then set the new plan
-              setTimeout(() => {
-                setSelectedPlan(menu.id);
-                loadIngredientsFromPlan(menu.ingredients);
+  // Handle plan selection or deselection
+  const handlePlanSelection = async (menu) => {
+    // If there's a plan already selected
+    if (isMenuSelected(menu.id)) {
+      try {
+        // Show confirmation dialog
+        Alert.alert(
+          'Désactiver le plan',
+          'Voulez-vous vraiment désactiver ce plan ? Votre progression sera perdue.',
+          [
+            {
+              text: 'Annuler',
+              style: 'cancel'
+            },
+            {
+              text: 'Désactiver',
+              style: 'destructive',
+              onPress: async () => {
+                // First clear the batch cooking state
+                await clearActivePlan();
+                console.log("Cleared batch cooking state");
                 
-                // Try to activate in batch cooking system
-                activatePlan(menu.id).then(success => {
-                  if (success) {
-                    Alert.alert('Success', 'Menu plan updated!');
-                  }
-                });
-              }, 100);
-            } catch (error) {
-              console.error('Failed to update plan:', error);
-              Alert.alert('Error', 'Failed to update the menu plan. Please try again.');
+                // Then clear the plan store state
+                clearIngredients();
+                setSelectedPlan(null);
+                console.log("Cleared plan store state");
+                
+                Alert.alert('Succès', 'Le plan a été désactivé.');
+              }
             }
-          },
-        },
-      ]
-    );
-  } else {
-    // Update both stores when no plan is active
-    setSelectedPlan(menu.id);
-    loadIngredientsFromPlan(menu.ingredients);
-    
-    activatePlan(menu.id).then(success => {
-      if (success) {
-        Alert.alert('Success', 'Menu plan activated!');
+          ]
+        );
+      } catch (error) {
+        console.error('Failed to deactivate plan:', error);
+        Alert.alert('Erreur', 'Impossible de désactiver le plan. Veuillez réessayer.');
       }
-    });
-  }
-};
+      return;
+    }
+    
+    // If we're activating a new plan
+    try {
+      // Show confirmation dialog
+      Alert.alert(
+        'Activer le plan',
+        'Voulez-vous activer ce plan de batch cooking ?',
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          },
+          {
+            text: 'Activer',
+            onPress: async () => {
+              setIsLoading(true);
+              
+              try {
+                // First clear any existing plan
+                if (activePlanId || selectedPlanId) {
+                  await clearActivePlan();
+                  clearIngredients();
+                  setSelectedPlan(null);
+                  console.log("Cleared previous plan");
+                }
+                
+                // Then activate the new plan
+                console.log("Setting new plan:", menu.id);
+                
+                // First activate the batch cooking plan
+                const success = await activatePlan(menu.id);
+                console.log("Updated batch cooking state:", success);
+                
+                if (success) {
+                  // Then update the plan store
+                  setSelectedPlan(menu.id);
+                  loadIngredientsFromPlan(menu.ingredients);
+                  console.log("Updated plan store");
+                  
+                  Alert.alert(
+                    'Succès',
+                    'Le plan a été activé ! Vous pouvez maintenant accéder aux instructions dans l\'onglet Cooking.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          // Close the modal if open
+                          setSelectedMenu(null);
+                        }
+                      }
+                    ]
+                  );
+                }
+              } catch (error) {
+                console.error('Failed to activate plan:', error);
+                Alert.alert('Erreur', 'Impossible d\'activer le plan. Veuillez réessayer.');
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to show activation dialog:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+    }
+  };
 
   const renderMenuCard = ({ item }) => (
     <TouchableOpacity
@@ -260,7 +239,7 @@ const handlePlanSelection = (menu) => {
         {isMenuSelected(item.id) && (
           <View style={localStyles.selectedBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
-            <Text style={localStyles.badgeText}>Selected</Text>
+            <Text style={localStyles.badgeText}>Sélectionné</Text>
           </View>
         )}
       </View>
@@ -588,27 +567,27 @@ const handlePlanSelection = (menu) => {
                   </View>
                 )}
 
-                <TouchableOpacity
-                  style={[
-                    localStyles.selectButton,
-                    isMenuSelected(selectedMenu.id) &&
-                      localStyles.selectedButton,
-                    isActivatingPlan && { opacity: 0.7 },
-                  ]}
-                  onPress={() => {
-                    handlePlanSelection(selectedMenu);
-                    setSelectedMenu(null);
-                  }}
-                  disabled={isActivatingPlan}
-                >
-                  <Text style={localStyles.selectButtonText}>
-                    {isActivatingPlan
-                      ? 'CHARGEMENT...'
-                      : isMenuSelected(selectedMenu.id)
-                      ? 'PLAN SÉLECTIONNÉ'
-                      : 'SÉLECTIONNER CE PLAN'}
-                  </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      localStyles.selectButton,
+                      isMenuSelected(selectedMenu.id) && localStyles.selectedButton,
+                      isActivatingPlan && { opacity: 0.7 },
+                    ]}
+                    onPress={() => {
+                      console.log("Plan selection button pressed for:", selectedMenu.id);
+                      handlePlanSelection(selectedMenu);
+                      setSelectedMenu(null);
+                    }}
+                    disabled={isActivatingPlan}
+                  >
+                    <Text style={localStyles.selectButtonText}>
+                      {isActivatingPlan
+                        ? 'CHARGEMENT...'
+                        : isMenuSelected(selectedMenu.id)
+                        ? 'DÉSACTIVER CE PLAN'
+                        : 'SÉLECTIONNER CE PLAN'}
+                    </Text>
+                  </TouchableOpacity>
 
                 {selectedMenu.isPremium && (
                   <TouchableOpacity
@@ -880,7 +859,7 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#F44336',
   },
   selectButtonText: {
     color: '#FFFFFF',

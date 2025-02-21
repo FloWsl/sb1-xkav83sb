@@ -1,3 +1,4 @@
+// app/[tabs]/plan.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -30,25 +31,17 @@ export default function PlanScreen() {
     error,
     currentPhase,
     completedTasks,
-    activeTimers,
     setPhase,
     completeTask,
     uncompleteTask,
     isTaskCompleted,
-    startTimer,
-    pauseTimer,
-    resumeTimer,
-    cancelTimer,
-    addTimeToTimer,
     calculateProgress,
-    getAllPhases,
     clearActivePlan,
   } = useBatchCooking();
 
   // Local state
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
-  const [expandedTimers, setExpandedTimers] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = styles.getThemeColors(colorScheme);
@@ -64,115 +57,14 @@ export default function PlanScreen() {
       const index = phases.findIndex((phase) => phase.num === currentPhase);
       if (index !== -1) {
         setCurrentPhaseIndex(index);
-        // Scroll phase list to current phase
-        phaseListRef.current?.scrollToIndex({
-          index,
-          animated: true,
-          viewPosition: 0.5,
-        });
       }
     }
   }, [currentPhase, phases]);
 
-  // Reset cooking session
-  const resetSession = () => {
-    Alert.alert(
-      'Réinitialiser la session',
-      'Voulez-vous vraiment recommencer depuis le début ? Tous vos progrès seront perdus.',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-        {
-          text: 'Réinitialiser',
-          style: 'destructive',
-          onPress: () => {
-            clearActivePlan();
-            router.replace('/');
-          },
-        },
-      ]
-    );
-  };
-
-  // Toggle task completion
-  const toggleTask = (taskId: string) => {
-    if (isTaskCompleted(taskId)) {
-      uncompleteTask(taskId);
-    } else {
-      completeTask(taskId);
-
-      // Check if phase is complete
-      const currentPhaseObj = phases[currentPhaseIndex];
-      if (currentPhaseObj) {
-        let totalTasks = 0;
-        let completedTaskCount = 0;
-
-        currentPhaseObj.sec.forEach((section) => {
-          section.t.forEach((task) => {
-            const taskKey = `${currentPhaseObj.num}-${task.t}-${task.i}`;
-            totalTasks++;
-            if (isTaskCompleted(taskKey) || taskId === taskKey) {
-              completedTaskCount++;
-            }
-          });
-        });
-
-        if (completedTaskCount === totalTasks) {
-          // Phase complete, show alert
-          if (currentPhaseIndex < phases.length - 1) {
-            setTimeout(() => {
-              Alert.alert(
-                'Phase terminée !',
-                'Voulez-vous passer à la phase suivante ?',
-                [
-                  {
-                    text: 'Rester ici',
-                    style: 'cancel',
-                  },
-                  {
-                    text: 'Phase suivante',
-                    onPress: () => handlePhaseChange(currentPhaseIndex + 1),
-                  },
-                ]
-              );
-            }, 500);
-          }
-        }
-      }
-    }
-  };
-
-  // Handle phase change
   const handlePhaseChange = (index: number) => {
     if (index >= 0 && index < phases.length) {
       setCurrentPhaseIndex(index);
       setPhase(phases[index].num);
-      phaseListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5,
-      });
-    }
-  };
-
-  // Start a timer for a task
-  const handleStartTimer = (task: Task) => {
-    // Extract duration in minutes from task time (format: "10min")
-    const durationMatch = task.t.match(/(\d+)/);
-    if (durationMatch && durationMatch[1]) {
-      const minutes = parseInt(durationMatch[1], 10);
-      const seconds = minutes * 60;
-      const timerId = startTimer(task.i, seconds);
-
-      Alert.alert(
-        'Minuteur démarré',
-        `Un minuteur de ${minutes} minute${
-          minutes > 1 ? 's' : ''
-        } a été démarré pour "${task.i}".`,
-        [{ text: 'OK' }]
-      );
     }
   };
 
@@ -225,7 +117,7 @@ export default function PlanScreen() {
         style={[localStyles.container, isDark && localStyles.containerDark]}
       >
         <View style={localStyles.loadingContainer}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
+          <ActivityIndicator size="large" color="#FF6B6B" />
           <Text
             style={[localStyles.loadingText, isDark && localStyles.textLight]}
           >
@@ -246,7 +138,7 @@ export default function PlanScreen() {
           <Ionicons
             name="alert-circle-outline"
             size={80}
-            color={themeColors.error}
+            color="#F44336"
           />
           <Text
             style={[localStyles.errorTitle, isDark && localStyles.textLight]}
@@ -269,503 +161,195 @@ export default function PlanScreen() {
     );
   }
 
-  // Render phase item for horizontal scroll
-  const renderPhaseItem = ({ item, index }: { item: Phase; index: number }) => {
-    // Count completed tasks in phase
-    let totalTasks = 0;
-    let completedTaskCount = 0;
-
-    item.sec.forEach((section) => {
-      section.t.forEach((task) => {
-        const taskId = `${item.num}-${task.t}-${task.i}`;
-        totalTasks++;
-        if (isTaskCompleted(taskId)) {
-          completedTaskCount++;
-        }
-      });
-    });
-
-    const progress =
-      totalTasks > 0 ? Math.round((completedTaskCount / totalTasks) * 100) : 0;
-
-    return (
-      <TouchableOpacity
-        style={[
-          localStyles.phaseButton,
-          currentPhaseIndex === index && localStyles.phaseButtonActive,
-          isDark && localStyles.phaseButtonDark,
-          currentPhaseIndex === index &&
-            isDark &&
-            localStyles.phaseButtonActiveDark,
-        ]}
-        onPress={() => handlePhaseChange(index)}
-      >
-        <Text
-          style={[
-            localStyles.phaseButtonText,
-            currentPhaseIndex === index && localStyles.phaseButtonTextActive,
-            isDark && localStyles.textLight,
-          ]}
-        >
-          {item.n}
-        </Text>
-        <Text style={[localStyles.phaseTime, isDark && localStyles.textLight]}>
-          {item.st} - {item.en}
-        </Text>
-        <View style={localStyles.progressBarBackground}>
-          <View
-            style={[localStyles.progressBarFill, { width: `${progress}%` }]}
-          />
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Render task card
-  const renderTask = (task: Task, phase: Phase, section: Section) => {
-    const taskId = `${phase.num}-${task.t}-${task.i}`;
-    const isCompleted = isTaskCompleted(taskId);
-
-    // Don't render completed tasks if showCompletedTasks is false
-    if (isCompleted && !showCompletedTasks) {
-      return null;
-    }
-
-    // Check if there's an active timer for this task
-    const taskTimer = activeTimers.find((timer) => timer.name === task.i);
-
-    return (
-      <View
-        key={taskId}
-        style={[
-          localStyles.taskCard,
-          isDark && localStyles.taskCardDark,
-          isCompleted && localStyles.taskCardCompleted,
-          task.pr === 'high' && localStyles.taskCardPriorityHigh,
-          task.pr === 'medium' && localStyles.taskCardPriorityMedium,
-          task.pr === 'low' && localStyles.taskCardPriorityLow,
-        ]}
-      >
-        <View style={localStyles.taskHeader}>
-          <View style={localStyles.taskTimeContainer}>
-            <Ionicons
-              name="time-outline"
-              size={24}
-              color={isDark ? '#FFFFFF' : '#000000'}
-            />
-            <Text
-              style={[localStyles.taskTime, isDark && localStyles.textLight]}
-            >
-              {task.t}
-            </Text>
-          </View>
-
-          <View style={localStyles.taskActions}>
-            {!taskTimer && !isCompleted && (
-              <TouchableOpacity
-                style={localStyles.timerButton}
-                onPress={() => handleStartTimer(task)}
-              >
-                <Ionicons
-                  name="timer-outline"
-                  size={24}
-                  color={themeColors.secondary}
-                />
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={localStyles.checkButton}
-              onPress={() => toggleTask(taskId)}
-            >
-              <Ionicons
-                name={
-                  isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'
-                }
-                size={28}
-                color={
-                  isCompleted ? themeColors.success : themeColors.mediumGray
-                }
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <Text
-          style={[
-            localStyles.taskInstruction,
-            isDark && localStyles.textLight,
-            isCompleted && localStyles.taskCompletedText,
-          ]}
-        >
-          {task.i}
-        </Text>
-
-        {taskTimer && (
-          <View style={localStyles.activeTimerContainer}>
-            <View style={localStyles.timerRow}>
-              <Ionicons
-                name="alarm-outline"
-                size={20}
-                color={themeColors.secondary}
-              />
-              <Text style={localStyles.timerText}>
-                {taskTimer.isPaused ? 'En pause' : 'En cours'}
-              </Text>
-
-              <View style={localStyles.timerControls}>
-                {taskTimer.isPaused ? (
-                  <TouchableOpacity
-                    style={localStyles.timerControlButton}
-                    onPress={() => resumeTimer(taskTimer.id)}
-                  >
-                    <Ionicons
-                      name="play"
-                      size={20}
-                      color={themeColors.success}
-                    />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={localStyles.timerControlButton}
-                    onPress={() => pauseTimer(taskTimer.id)}
-                  >
-                    <Ionicons
-                      name="pause"
-                      size={20}
-                      color={themeColors.warning}
-                    />
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={localStyles.timerControlButton}
-                  onPress={() => cancelTimer(taskTimer.id)}
-                >
-                  <Ionicons name="close" size={20} color={themeColors.error} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  // Render current phase
-  const renderCurrentPhase = () => {
+  // Simplified phase view
+  const renderPhase = () => {
     if (!phases.length || currentPhaseIndex >= phases.length) {
-      return null;
+      return (
+        <View style={localStyles.noPhaseContainer}>
+          <Text style={[localStyles.noPhaseText, isDark && localStyles.textLight]}>
+            Aucune phase disponible
+          </Text>
+        </View>
+      );
     }
 
     const currentPhaseObj = phases[currentPhaseIndex];
 
     return (
       <View style={localStyles.phaseContainer}>
-        {currentPhaseObj.sec.map((section, sectionIndex) => {
-          // Check if section has any uncompleted tasks or if we're showing completed tasks
-          const hasTasks = section.t.some((task) => {
-            const taskId = `${currentPhaseObj.num}-${task.t}-${task.i}`;
-            return !isTaskCompleted(taskId) || showCompletedTasks;
-          });
-
-          if (!hasTasks) {
-            return null;
-          }
-
-          return (
-            <View
-              key={`${currentPhaseObj.num}-${sectionIndex}`}
-              style={localStyles.sectionContainer}
-            >
-              <Text
-                style={[
-                  localStyles.sectionTitle,
-                  isDark && localStyles.textLight,
-                ]}
-              >
-                {section.n}
-              </Text>
-              {section.t.map((task) =>
-                renderTask(task, currentPhaseObj, section)
-              )}
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
-
-  // Render active timers section
-  const renderActiveTimers = () => {
-    if (activeTimers.length === 0) {
-      return null;
-    }
-
-    return (
-      <View
-        style={[
-          localStyles.activeTimersContainer,
-          isDark && localStyles.activeTimersContainerDark,
-          !expandedTimers && localStyles.activeTimersCollapsed,
-        ]}
-      >
-        <TouchableOpacity
-          style={localStyles.expandTimersButton}
-          onPress={() => setExpandedTimers(!expandedTimers)}
-        >
-          <View style={localStyles.expandTimersHeader}>
-            <Ionicons
-              name="alarm-outline"
-              size={24}
-              color={themeColors.secondary}
-            />
-            <Text style={localStyles.expandTimersText}>
-              {activeTimers.length} Minuteur{activeTimers.length > 1 ? 's' : ''}{' '}
-              actif{activeTimers.length > 1 ? 's' : ''}
+        <Text style={[localStyles.phaseTitle, isDark && localStyles.textLight]}>
+          {currentPhaseObj.n}
+        </Text>
+        <Text style={[localStyles.phaseTime, isDark && localStyles.textLight]}>
+          {currentPhaseObj.st} - {currentPhaseObj.en}
+        </Text>
+        
+        {currentPhaseObj.sec.map((section, sIndex) => (
+          <View key={`section-${sIndex}`} style={localStyles.sectionContainer}>
+            <Text style={[localStyles.sectionTitle, isDark && localStyles.textLight]}>
+              {section.n}
             </Text>
-          </View>
-          <Ionicons
-            name={expandedTimers ? 'chevron-down' : 'chevron-up'}
-            size={24}
-            color={themeColors.mediumGray}
-          />
-        </TouchableOpacity>
-
-        {expandedTimers && (
-          <View style={localStyles.timersList}>
-            {activeTimers.map((timer) => (
-              <View key={timer.id} style={localStyles.timerItem}>
-                <Text
-                  style={localStyles.timerItemName}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
+            
+            {section.t.map((task, tIndex) => {
+              // Use a simple index-based ID - no complex concatenation
+              const taskId = `${currentPhaseObj.num}-${sIndex}-${tIndex}`;
+              const completed = isTaskCompleted(taskId);
+              
+              // Skip completed tasks if we're not showing them
+              if (completed && !showCompletedTasks) return null;
+              
+              return (
+                <TouchableOpacity
+                  key={`task-${tIndex}`}
+                  style={[
+                    localStyles.taskCard,
+                    isDark && localStyles.taskCardDark,
+                    completed && localStyles.taskCardCompleted
+                  ]}
+                  onPress={() => {
+                    if (completed) {
+                      uncompleteTask(taskId);
+                    } else {
+                      completeTask(taskId);
+                    }
+                  }}
                 >
-                  {timer.name}
-                </Text>
-                <View style={localStyles.timerItemControls}>
-                  {timer.isPaused ? (
-                    <TouchableOpacity
-                      style={localStyles.timerItemButton}
-                      onPress={() => resumeTimer(timer.id)}
-                    >
+                  <View style={localStyles.taskHeader}>
+                    <View style={localStyles.taskTimeContainer}>
                       <Ionicons
-                        name="play"
-                        size={20}
-                        color={themeColors.success}
+                        name="time-outline"
+                        size={18}
+                        color={isDark ? '#FFFFFF' : '#000000'}
                       />
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={localStyles.timerItemButton}
-                      onPress={() => pauseTimer(timer.id)}
-                    >
-                      <Ionicons
-                        name="pause"
-                        size={20}
-                        color={themeColors.warning}
-                      />
-                    </TouchableOpacity>
-                  )}
-
-                  <TouchableOpacity
-                    style={localStyles.timerItemButton}
-                    onPress={() => cancelTimer(timer.id)}
-                  >
+                      <Text style={[localStyles.taskTime, isDark && localStyles.textLight]}>
+                        {task.t}
+                      </Text>
+                    </View>
+                    
                     <Ionicons
-                      name="close"
-                      size={20}
-                      color={themeColors.error}
+                      name={completed ? "checkmark-circle" : "checkmark-circle-outline"}
+                      size={24}
+                      color={completed ? "#4CAF50" : "#CCCCCC"}
                     />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+                  </View>
+                  
+                  <Text 
+                    style={[
+                      localStyles.taskInstruction,
+                      isDark && localStyles.textLight,
+                      completed && localStyles.taskCompletedText
+                    ]}
+                  >
+                    {task.i}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
+        ))}
       </View>
     );
   };
-
-  // Calculate progress for current phase
-  const getCurrentPhaseProgress = () => {
-    if (!phases.length || currentPhaseIndex >= phases.length) {
-      return { completed: 0, total: 0 };
-    }
-
-    const currentPhaseObj = phases[currentPhaseIndex];
-    let total = 0;
-    let completed = 0;
-
-    currentPhaseObj.sec.forEach((section) => {
-      section.t.forEach((task) => {
-        const taskId = `${currentPhaseObj.num}-${task.t}-${task.i}`;
-        total++;
-        if (isTaskCompleted(taskId)) {
-          completed++;
-        }
-      });
-    });
-
-    return { completed, total };
-  };
-
-  const currentProgress = getCurrentPhaseProgress();
-  const overallProgress = calculateProgress();
 
   return (
     <SafeAreaView
       style={[localStyles.container, isDark && localStyles.containerDark]}
     >
+      {/* Header */}
       <View style={localStyles.header}>
-        <View style={localStyles.headerTop}>
+        <View style={localStyles.headerRow}>
           <Text style={[localStyles.title, isDark && localStyles.textLight]}>
             Plan de cuisine
           </Text>
           <TouchableOpacity
             style={localStyles.resetButton}
-            onPress={resetSession}
+            onPress={() => {
+              Alert.alert(
+                'Réinitialiser',
+                'Voulez-vous réinitialiser le plan?',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { 
+                    text: 'Confirmer', 
+                    style: 'destructive',
+                    onPress: () => {
+                      clearActivePlan();
+                      router.replace('/');
+                    }
+                  }
+                ]
+              );
+            }}
           >
-            <Ionicons
-              name="refresh-circle-outline"
-              size={28}
-              color={isDark ? '#FFFFFF' : '#000000'}
-            />
+            <Ionicons name="refresh" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
           </TouchableOpacity>
         </View>
-
+        
+        {/* Progress bar */}
         <View style={localStyles.progressContainer}>
-          <Text
-            style={[localStyles.progressText, isDark && localStyles.textLight]}
-          >
-            Phase {currentPhaseIndex + 1}: {currentProgress.completed}/
-            {currentProgress.total} tâches
+          <Text style={[localStyles.progressText, isDark && localStyles.textLight]}>
+            Progression: {calculateProgress()}%
           </Text>
-          <Text
-            style={[
-              localStyles.overallProgressText,
-              isDark && localStyles.textLight,
-            ]}
-          >
-            Progression totale: {overallProgress}%
-          </Text>
-        </View>
-
-        <View style={localStyles.progressBarContainer}>
-          <View
-            style={[
-              localStyles.progressBarFull,
-              { width: `${overallProgress}%` },
-            ]}
-          />
+          <View style={localStyles.progressBar}>
+            <View 
+              style={[
+                localStyles.progressFill, 
+                { width: `${calculateProgress()}%` }
+              ]} 
+            />
+          </View>
         </View>
       </View>
 
-      <FlatList
-        ref={phaseListRef}
-        data={phases}
-        renderItem={renderPhaseItem}
-        keyExtractor={(item) => item.num}
+      {/* Phase selector */}
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={localStyles.phaseList}
-        snapToAlignment="center"
-        decelerationRate="fast"
-        onScrollToIndexFailed={() => {}}
-        initialScrollIndex={currentPhaseIndex}
-      />
+        style={localStyles.phaseSelector}
+        contentContainerStyle={localStyles.phaseSelectorContent}
+      >
+        {phases.map((phase, index) => (
+          <TouchableOpacity
+            key={`phase-${index}`}
+            style={[
+              localStyles.phaseButton,
+              currentPhaseIndex === index && localStyles.phaseButtonActive,
+              isDark && localStyles.phaseButtonDark
+            ]}
+            onPress={() => handlePhaseChange(index)}
+          >
+            <Text 
+              style={[
+                localStyles.phaseButtonText,
+                currentPhaseIndex === index && localStyles.phaseButtonTextActive
+              ]}
+            >
+              {phase.n}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-      <View style={localStyles.controlRow}>
+      {/* Toggle completed tasks */}
+      <View style={localStyles.controlsContainer}>
         <TouchableOpacity
-          style={[
-            localStyles.toggleButton,
-            showCompletedTasks && localStyles.toggleButtonActive,
-          ]}
+          style={localStyles.toggleButton}
           onPress={() => setShowCompletedTasks(!showCompletedTasks)}
         >
           <Ionicons
-            name={showCompletedTasks ? 'eye-outline' : 'eye-off-outline'}
+            name={showCompletedTasks ? "eye" : "eye-off"}
             size={20}
-            color={
-              showCompletedTasks ? themeColors.primary : themeColors.mediumGray
-            }
+            color="#666666"
           />
-          <Text
-            style={[
-              localStyles.toggleButtonText,
-              showCompletedTasks && localStyles.toggleButtonTextActive,
-            ]}
-          >
-            {showCompletedTasks ? 'Masquer terminées' : 'Afficher terminées'}
+          <Text style={localStyles.toggleText}>
+            {showCompletedTasks ? "Masquer terminées" : "Afficher terminées"}
           </Text>
         </TouchableOpacity>
-
-        {currentPhaseIndex > 0 && (
-          <TouchableOpacity
-            style={localStyles.navButton}
-            onPress={() => handlePhaseChange(currentPhaseIndex - 1)}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={20}
-              color={themeColors.mediumGray}
-            />
-            <Text style={localStyles.navButtonText}>Phase précédente</Text>
-          </TouchableOpacity>
-        )}
-
-        {currentPhaseIndex < phases.length - 1 && (
-          <TouchableOpacity
-            style={localStyles.navButton}
-            onPress={() => handlePhaseChange(currentPhaseIndex + 1)}
-          >
-            <Text style={localStyles.navButtonText}>Phase suivante</Text>
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={themeColors.mediumGray}
-            />
-          </TouchableOpacity>
-        )}
       </View>
 
-      {renderActiveTimers()}
-
-      <ScrollView
-        style={localStyles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {renderCurrentPhase()}
-
-        {currentProgress.completed === currentProgress.total &&
-          currentProgress.total > 0 && (
-            <View
-              style={[
-                localStyles.phaseComplete,
-                isDark && localStyles.phaseCompleteDark,
-              ]}
-            >
-              <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
-              <Text
-                style={[
-                  localStyles.phaseCompleteText,
-                  isDark && localStyles.textLight,
-                ]}
-              >
-                Phase terminée !
-              </Text>
-              {currentPhaseIndex < phases.length - 1 && (
-                <TouchableOpacity
-                  style={localStyles.nextPhaseButton}
-                  onPress={() => handlePhaseChange(currentPhaseIndex + 1)}
-                >
-                  <Text style={localStyles.nextPhaseButtonText}>
-                    Passer à la phase suivante
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+      {/* Main content */}
+      <ScrollView style={localStyles.content}>
+        {renderPhase()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -777,13 +361,13 @@ const localStyles = StyleSheet.create({
     backgroundColor: '#F7F7F7',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#121212',
   },
   header: {
     padding: 20,
     paddingBottom: 10,
   },
-  headerTop: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -796,91 +380,57 @@ const localStyles = StyleSheet.create({
     padding: 8,
   },
   progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    marginTop: 15,
   },
   progressText: {
-    fontSize: 16,
-    color: '#666666',
-  },
-  overallProgressText: {
     fontSize: 14,
-    color: '#666666',
+    marginBottom: 5,
   },
-  progressBarContainer: {
-    height: 4,
+  progressBar: {
+    height: 8,
     backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    marginTop: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
-  progressBarFull: {
+  progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
   },
-  textLight: {
-    color: '#FFFFFF',
+  phaseSelector: {
+    maxHeight: 50,
   },
-  content: {
-    flex: 1,
-  },
-  phaseList: {
-    paddingHorizontal: 10,
-    gap: 10,
+  phaseSelectorContent: {
+    paddingHorizontal: 15,
     paddingVertical: 5,
+    gap: 10,
   },
   phaseButton: {
     backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    elevation: 2,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    width: width * 0.4,
-    marginHorizontal: 5,
+    elevation: 2,
   },
   phaseButtonDark: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#2A2A2A',
   },
   phaseButtonActive: {
     backgroundColor: '#FF6B6B',
   },
-  phaseButtonActiveDark: {
-    backgroundColor: '#FF6B6B',
-  },
   phaseButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 14,
+    color: '#333333',
   },
   phaseButtonTextActive: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
-  phaseTime: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-  },
-  progressBarBackground: {
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 2,
-    width: '90%',
-    marginTop: 8,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-  },
-  controlRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  controlsContainer: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -889,77 +439,72 @@ const localStyles = StyleSheet.create({
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    gap: 5,
   },
-  toggleButtonActive: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-  },
-  toggleButtonText: {
+  toggleText: {
     fontSize: 14,
     color: '#666666',
-    marginLeft: 6,
   },
-  toggleButtonTextActive: {
-    color: '#4CAF50',
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  navButtonText: {
-    fontSize: 14,
-    color: '#666666',
+  content: {
+    flex: 1,
   },
   phaseContainer: {
     padding: 20,
+  },
+  noPhaseContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noPhaseText: {
+    fontSize: 16,
+    color: '#666666',
+  },
+  phaseTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  phaseTime: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 20,
   },
   sectionContainer: {
     marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 15,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
   },
   taskCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
-    elevation: 3,
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    minHeight: 100,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E0E0E0',
+    shadowRadius: 2,
+    elevation: 2,
   },
   taskCardDark: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#2A2A2A',
   },
   taskCardCompleted: {
     backgroundColor: '#F5F5F5',
+    borderLeftWidth: 3,
     borderLeftColor: '#4CAF50',
-  },
-  taskCardPriorityHigh: {
-    borderLeftColor: '#F44336',
-  },
-  taskCardPriorityMedium: {
-    borderLeftColor: '#FF9800',
-  },
-  taskCardPriorityLow: {
-    borderLeftColor: '#2196F3',
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   taskTimeContainer: {
     flexDirection: 'row',
@@ -967,142 +512,19 @@ const localStyles = StyleSheet.create({
     gap: 5,
   },
   taskTime: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
-  taskActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  timerButton: {
-    padding: 5,
-  },
-  checkButton: {
-    padding: 5,
-  },
   taskInstruction: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 22,
   },
   taskCompletedText: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.7,
   },
-  activeTimerContainer: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: 'rgba(255, 152, 0, 0.1)',
-    borderRadius: 8,
-  },
-  timerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timerText: {
-    fontSize: 14,
-    color: '#FF9800',
-    fontWeight: '500',
-    flex: 1,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  timerControlButton: {
-    padding: 5,
-  },
-  activeTimersContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    margin: 10,
-    marginBottom: 0,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  activeTimersContainerDark: {
-    backgroundColor: '#1A1A1A',
-  },
-  activeTimersCollapsed: {
-    maxHeight: 60,
-  },
-  expandTimersButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-  },
-  expandTimersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  expandTimersText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#666666',
-  },
-  timersList: {
-    paddingHorizontal: 15,
-    paddingBottom: 15,
-  },
-  timerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  timerItemName: {
-    fontSize: 14,
-    color: '#333333',
-    flex: 1,
-    marginRight: 10,
-  },
-  timerItemControls: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  timerItemButton: {
-    padding: 5,
-  },
-  phaseComplete: {
-    backgroundColor: '#FFFFFF',
-    margin: 20,
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  phaseCompleteDark: {
-    backgroundColor: '#1A1A1A',
-  },
-  phaseCompleteText: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 10,
-  },
-  nextPhaseButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 15,
-  },
-  nextPhaseButtonText: {
+  textLight: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   emptyStateContainer: {
     flex: 1,

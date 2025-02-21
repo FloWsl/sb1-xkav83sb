@@ -1,11 +1,13 @@
-// app/lib/api.ts
+// lib/api.ts
 import axios from 'axios';
+import { dummyPlans, dummyMenus, dummyShoppingItems } from './dummyData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { 
   BatchCookingData,
   PlanSummary,
   UserPreferences
 } from '../types/schema';
+
 
 // Create axios instance with configuration
 const api = axios.create({
@@ -196,6 +198,16 @@ export async function fetchRecipes(options: RequestOptions = {}) {
  * Fetch all available meal plans for the discovery screen
  */
 export async function fetchPlans(options: RequestOptions = {}): Promise<PlanSummary[]> {
+  // Check if we should use demo data
+  const isDemoMode = true; // Set to false when connecting to real API
+  
+  if (isDemoMode) {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return dummyMenus;
+  }
+  
+  // Original API code below
   const { useCache = true, forceRefresh = false } = options;
   
   // Try cache first if appropriate
@@ -229,6 +241,26 @@ export async function fetchPlans(options: RequestOptions = {}): Promise<PlanSumm
  * Fetch plan details by ID
  */
 export async function fetchPlanById(planId: string, options: RequestOptions = {}): Promise<BatchCookingData> {
+  // Check if we should use demo data
+  const isDemoMode = true; // Set to false when connecting to real API
+  
+  if (isDemoMode) {
+    console.log("API: Fetching plan in demo mode, ID:", planId);
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Get dummy plan data
+    const plan = dummyPlans[planId];
+    if (!plan) {
+      console.error(`API: Plan with ID ${planId} not found`);
+      throw new Error(`Plan with ID ${planId} not found`);
+    }
+    
+    console.log("API: Successfully retrieved plan");
+    return plan;
+  }
+  
+  // Original API code remains below
   const { useCache = true, forceRefresh = false } = options;
   const cacheKey = `${CACHE_KEYS.WEEK_DATA}${planId}`;
   

@@ -1,4 +1,4 @@
-// app/types/schema.ts
+// /types/schema.ts
 export interface Ingredient {
   id: string;
   cat: string;
@@ -39,8 +39,8 @@ export interface Recipe {
 export interface Task {
   t: string;
   i: string;
-  c: boolean;
-  pr: string;
+  c?: boolean; // Make completed optional
+  pr?: string; // Make pr optional if it's not always present
   td?: number; // Optional timer duration in minutes
 }
 
@@ -58,8 +58,8 @@ export interface Phase {
 }
 
 export interface BatchPlan {
-  d: string;
-  p: Phase[];
+  d: string;  // Total duration 
+  p: Phase[]; // Phases - this property name is critical
 }
 
 export interface Meta {
