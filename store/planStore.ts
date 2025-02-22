@@ -49,32 +49,41 @@ const safeClone = (obj: any): any => {
   }
 };
 
-// Custom serializer to handle non-serializable data
+// Simpler serializer to avoid potential issues
 const customSerializer = {
   serialize: (state: any) => {
     try {
-      // Use safe cloning to ensure everything is serializable
-      const safeState = safeClone(state);
-      return JSON.stringify(safeState);
+      // Only serialize what we need, avoiding potential circular references
+      const stateToSave = {
+        selectedPlanId: state.selectedPlanId,
+        // Only need to store IDs of ingredients, recipes, and equipment in storage
+        // The actual data can be loaded again when needed
+        ingredientIds: state.ingredients.map((item: any) => item.id),
+        recipeIds: state.recipes.map((item: any) => item.id),
+        equipmentIds: state.equipment.map((item: any) => item.id),
+      };
+      return JSON.stringify(stateToSave);
     } catch (error) {
       console.error('Serialization error:', error);
       return JSON.stringify({
         selectedPlanId: null,
-        ingredients: [],
-        recipes: [],
-        equipment: []
+        ingredientIds: [],
+        recipeIds: [],
+        equipmentIds: []
       });
     }
   },
   deserialize: (str: string) => {
     try {
-      return JSON.parse(str, (key, value) => {
-        // Revive special cases
-        if (value && value.__type === 'Date') {
-          return new Date(value.value);
-        }
-        return value;
-      });
+      const savedState = JSON.parse(str);
+      // Return a state object with empty arrays for the actual data
+      // The data will be loaded when a plan is selected
+      return {
+        selectedPlanId: savedState.selectedPlanId,
+        ingredients: [],
+        recipes: [],
+        equipment: []
+      };
     } catch (error) {
       console.error('Deserialization error:', error);
       return {
@@ -103,14 +112,18 @@ interface PlanStore {
 
 export const usePlanStore = create<PlanStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       selectedPlanId: null,
       ingredients: [],
       recipes: [],
       equipment: [],
       setSelectedPlan: (planId) => {
         console.log("Setting selected plan in store:", planId);
-        set({ selectedPlanId: planId });
+        // Force a re-render by creating a new state object
+        set((state) => ({
+          ...state,
+          selectedPlanId: planId
+        }));
       },
       addIngredient: (ingredient) => 
         set((state) => ({ 
@@ -123,24 +136,33 @@ export const usePlanStore = create<PlanStore>()(
           ),
         })),
       loadIngredientsFromPlan: (ingredients) => {
-        console.log("Loading ingredients in store:", ingredients.length);
+        console.log("Loading ingredients in store:", ingredients ? ingredients.length : 0);
         // Make sure ingredients are safely cloned before storing
-        const safeIngredients = safeClone(ingredients);
-        set({ ingredients: safeIngredients });
+        const safeIngredients = safeClone(ingredients || []);
+        set((state) => ({
+          ...state,
+          ingredients: safeIngredients
+        }));
       },
       loadRecipesFromPlan: (recipes) => {
-        console.log("Loading recipes in store:", recipes.length);
-        const safeRecipes = safeClone(recipes);
-        set({ recipes: safeRecipes });
+        console.log("Loading recipes in store:", recipes ? recipes.length : 0);
+        const safeRecipes = safeClone(recipes || []);
+        set((state) => ({
+          ...state,
+          recipes: safeRecipes
+        }));
       },
       loadEquipmentFromPlan: (equipment) => {
-        console.log("Loading equipment in store:", equipment.length);
-        const safeEquipment = safeClone(equipment);
-        set({ equipment: safeEquipment });
+        console.log("Loading equipment in store:", equipment ? equipment.length : 0);
+        const safeEquipment = safeClone(equipment || []);
+        set((state) => ({
+          ...state,
+          equipment: safeEquipment
+        }));
       },
       clearPlanData: () => {
         console.log("Clearing all plan data in store");
-        set({ 
+        set({
           selectedPlanId: null,
           ingredients: [],
           recipes: [],
@@ -150,11 +172,15 @@ export const usePlanStore = create<PlanStore>()(
     }),
     {
       name: 'plan-storage',
-      storage: createJSONStorage(() => ({
+      // Use a simpler storage implementation
+      storage: {
         getItem: async (name) => {
           try {
+            console.log("Getting item from storage:", name);
             const value = await AsyncStorage.getItem(name);
-            return value ? customSerializer.deserialize(value) : null;
+            if (!value) return null;
+            console.log("Item found in storage:", name);
+            return value;
           } catch (error) {
             console.error('Error getting item from storage:', error);
             return null;
@@ -162,24 +188,30 @@ export const usePlanStore = create<PlanStore>()(
         },
         setItem: async (name, value) => {
           try {
-            // Ensure value is serializable before storing
-            await AsyncStorage.setItem(name, customSerializer.serialize(value));
+            console.log("Setting item in storage:", name);
+            await AsyncStorage.setItem(name, value);
+            console.log("Item set in storage:", name);
           } catch (error) {
             console.error('Error setting item in storage:', error);
           }
         },
         removeItem: async (name) => {
           try {
+            console.log("Removing item from storage:", name);
             await AsyncStorage.removeItem(name);
+            console.log("Item removed from storage:", name);
           } catch (error) {
             console.error('Error removing item from storage:', error);
           }
         },
-      })),
+      },
       version: 1,
+      partialize: (state) => ({
+        selectedPlanId: state.selectedPlanId,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          console.log('Plan store hydrated successfully');
+          console.log('Plan store hydrated successfully with selectedPlanId:', state.selectedPlanId);
         } else {
           console.warn('Plan store hydration failed');
         }
@@ -188,3 +220,10 @@ export const usePlanStore = create<PlanStore>()(
   )
 );
 
+// Add a debug listener
+usePlanStore.subscribe(
+  (state) => state.selectedPlanId,
+  (selectedPlanId) => {
+    console.log("Plan store selectedPlanId changed to:", selectedPlanId);
+  }
+);

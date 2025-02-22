@@ -1,6 +1,7 @@
 // hooks/useBatchCooking.ts
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePlanStore } from '../store/planStore'; // Add this import
 
 // Import API functions
 import * as API from '../lib/api';
@@ -87,6 +88,9 @@ const serializeTimer = (timer: Timer): Timer => ({
 });
 
 export default function useBatchCooking() {
+  // Get the selectedPlanId from the plan store
+  const { selectedPlanId } = usePlanStore();
+  
   // State
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [planData, setPlanData] = useState<BatchCookingData | null>(null);
@@ -95,14 +99,19 @@ export default function useBatchCooking() {
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const [activeTimers, setActiveTimers] = useState<Timer[]>([]);
+  // Add a state to track if the initial data has been loaded
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load saved state from AsyncStorage
   useEffect(() => {
     const loadSavedState = async () => {
       try {
+        setIsLoading(true);
+        
         // Load active plan ID
         const savedPlanId = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_PLAN);
         if (savedPlanId) {
+          console.log("Found saved plan ID:", savedPlanId);
           setActivePlanId(savedPlanId);
         }
 
@@ -123,20 +132,65 @@ export default function useBatchCooking() {
         if (savedTimers) {
           setActiveTimers(JSON.parse(savedTimers));
         }
+        
+        setIsInitialized(true);
       } catch (error) {
         console.error('Failed to load saved batch cooking state:', error);
         setError('Failed to load your cooking progress. Please restart the app.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadSavedState();
   }, []);
 
+  // NEW: Sync with plan store when selectedPlanId changes
+  useEffect(() => {
+    // Skip if not initialized yet
+    if (!isInitialized) return;
+    
+    const syncWithPlanStore = async () => {
+      console.log("Syncing BatchCooking with plan store, selectedPlanId:", selectedPlanId);
+      
+      // If selectedPlanId exists and differs from activePlanId, update activePlanId
+      if (selectedPlanId && selectedPlanId !== activePlanId) {
+        console.log("Updating activePlanId from plan store:", selectedPlanId);
+        
+        // Update the active plan ID in AsyncStorage and state
+        await AsyncStorage.setItem(STORAGE_KEYS.ACTIVE_PLAN, selectedPlanId);
+        setActivePlanId(selectedPlanId);
+        
+        // Reset task completion state
+        setCompletedTasks([]);
+        await AsyncStorage.removeItem(STORAGE_KEYS.COMPLETED_TASKS);
+        
+        // Reset timers
+        setActiveTimers([]);
+        await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_TIMERS);
+        
+        // currentPhase will be set when plan data loads
+      }
+      // If selectedPlanId is null/empty but activePlanId exists, clear activePlanId
+      else if (!selectedPlanId && activePlanId) {
+        console.log("Clearing activePlanId since plan store has no selection");
+        await clearActivePlan();
+      }
+    };
+    
+    syncWithPlanStore();
+  }, [selectedPlanId, isInitialized, activePlanId]);
+
   // Load plan data when active plan changes
   useEffect(() => {
     const loadPlanData = async () => {
       if (!activePlanId) {
         setPlanData(null);
+        return;
+      }
+
+      if (!isInitialized) {
+        // Don't load plan data until initialization is complete
         return;
       }
 
@@ -159,11 +213,11 @@ export default function useBatchCooking() {
 
         // Ensure data is safely cloned before storing
         const safeData = safeClone(data);
-        console.log("Setting plan data:", JSON.stringify(safeData));
+        console.log("Setting plan data for activePlanId:", activePlanId);
         setPlanData(safeData);
         
         // If no current phase is set, default to the first phase
-        if (!currentPhase && safeData.b.p.length > 0) {
+        if (!currentPhase && safeData.b?.p && safeData.b.p.length > 0) {
           const firstPhase = safeData.b.p[0].num;
           setCurrentPhase(firstPhase);
           await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_PHASE, firstPhase);
@@ -177,11 +231,15 @@ export default function useBatchCooking() {
     };
 
     loadPlanData();
-  }, [activePlanId, currentPhase]);
+  }, [activePlanId, isInitialized]);
 
+  // The rest of your hook remains the same...
+  
   // Save completed tasks when they change
   useEffect(() => {
     const saveCompletedTasks = async () => {
+      if (!isInitialized) return;
+      
       try {
         await AsyncStorage.setItem(
           STORAGE_KEYS.COMPLETED_TASKS,
@@ -193,26 +251,28 @@ export default function useBatchCooking() {
     };
 
     saveCompletedTasks();
-  }, [completedTasks]);
+  }, [completedTasks, isInitialized]);
 
   // Save current phase when it changes
   useEffect(() => {
     const saveCurrentPhase = async () => {
-      if (currentPhase) {
-        try {
-          await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_PHASE, currentPhase);
-        } catch (error) {
-          console.error('Failed to save current phase:', error);
-        }
+      if (!isInitialized || !currentPhase) return;
+      
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_PHASE, currentPhase);
+      } catch (error) {
+        console.error('Failed to save current phase:', error);
       }
     };
 
     saveCurrentPhase();
-  }, [currentPhase]);
+  }, [currentPhase, isInitialized]);
 
   // Save active timers when they change
   useEffect(() => {
     const saveActiveTimers = async () => {
+      if (!isInitialized) return;
+      
       try {
         // Make sure timers are serializable
         const serializableTimers = safeClone(activeTimers.map(serializeTimer));
@@ -226,7 +286,7 @@ export default function useBatchCooking() {
     };
 
     saveActiveTimers();
-  }, [activeTimers]);
+  }, [activeTimers, isInitialized]);
 
   // Manage timers
   useEffect(() => {
@@ -239,8 +299,13 @@ export default function useBatchCooking() {
           // Skip paused timers
           if (timer.isPaused) return timer;
           
-          // Timer is running, but for now we just re-return it.
-          // You could update "elapsedSeconds" or something else if needed.
+          // Calculate remaining time to check for expired timers
+          const elapsedMs = Date.now() - timer.startTime;
+          const remainingMs = (timer.duration * 1000) - elapsedMs;
+          
+          // Handle expired timers here if needed
+          // For now we'll just keep the timer as is
+          
           return { ...timer };
         });
         
@@ -254,12 +319,14 @@ export default function useBatchCooking() {
   // Activate a plan
   const activatePlan = useCallback(async (planId: string) => {
     try {
+      setIsLoading(true);
       console.log("Activating plan in batch cooking:", planId);
       
       // First, try to fetch the plan data to validate it exists
       let planData: BatchCookingData;
       try {
         planData = await API.fetchPlanById(planId);
+        console.log("Successfully fetched plan data");
       } catch (error) {
         console.error('Failed to fetch plan data:', error);
         throw new Error('Could not fetch plan data');
@@ -273,13 +340,14 @@ export default function useBatchCooking() {
       setCompletedTasks([]);
       setActiveTimers([]);
       
-      // Set initial phase
-      if (planData.b.p.length > 0) {
+      // Set initial phase if available
+      if (planData.b?.p && planData.b.p.length > 0) {
         const firstPhase = planData.b.p[0].num;
         setCurrentPhase(firstPhase);
         await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_PHASE, firstPhase);
       } else {
         setCurrentPhase(null);
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_PHASE);
       }
       
       // Clear stored data
@@ -294,28 +362,37 @@ export default function useBatchCooking() {
       console.error('Failed to activate plan:', error);
       setError('Could not activate the cooking plan.');
       return false;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   // Clear active plan
   const clearActivePlan = useCallback(async () => {
     try {
+      setIsLoading(true);
       console.log("Clearing active plan in batch cooking");
+      
+      // Clear all AsyncStorage items
       await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAN);
       await AsyncStorage.removeItem(STORAGE_KEYS.COMPLETED_TASKS);
       await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_PHASE);
       await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_TIMERS);
       
+      // Reset all state
       setActivePlanId(null);
       setPlanData(null);
       setCompletedTasks([]);
       setCurrentPhase(null);
       setActiveTimers([]);
+      
       return true;
     } catch (error) {
       console.error('Failed to clear active plan:', error);
       setError('Could not clear the cooking plan.');
       return false;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -420,7 +497,7 @@ export default function useBatchCooking() {
   const getCurrentPhaseTasks = useCallback(() => {
     if (!planData || !currentPhase) return [];
     
-    const phase = planData.b.p.find(p => p.num === currentPhase);
+    const phase = planData.b?.p?.find(p => p.num === currentPhase);
     if (!phase) return [];
     
     // Flatten all tasks from all sections in the phase
@@ -430,7 +507,7 @@ export default function useBatchCooking() {
         // Create a unique ID for each task
         const taskWithId = {
           ...task,
-          id: `${phase.num}-${task.t}-${task.i}`
+          id: `${phase.num}-${section.n}-${task.t}`
         };
         tasks.push(taskWithId);
       });
@@ -441,13 +518,13 @@ export default function useBatchCooking() {
 
   // Get all phases
   const getAllPhases = useCallback((): Phase[] => {
-    if (!planData) return [];
+    if (!planData || !planData.b?.p) return [];
     return planData.b.p;
   }, [planData]);
 
   // Calculate progress percentage
   const calculateProgress = useCallback(() => {
-    if (!planData) return 0;
+    if (!planData || !planData.b?.p) return 0;
     
     // Count total tasks
     let totalTasks = 0;
@@ -507,6 +584,7 @@ export default function useBatchCooking() {
     cancelTimer,
     addTimeToTimer,
     getTimerRemainingTime,
-    calculateProgress
+    calculateProgress,
+    isInitialized
   };
 }

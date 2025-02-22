@@ -1,5 +1,5 @@
 // lib/dummyData.ts
-import type { BatchCookingData, ShoppingListItem, PlanSummary } from '../types/schema';
+import type { BatchCookingData, ShoppingListItem, PlanSummary, Recipe, Equipment } from '../types/schema';
 
 // Sample menu data for the discovery screen
 export const dummyMenus: PlanSummary[] = [
@@ -26,6 +26,75 @@ export const dummyMenus: PlanSummary[] = [
     isNew: false
   },
 ];
+
+// Sample recipes for each plan
+const sampleRecipes: Record<string, Recipe[]> = {
+  '1': [
+    {
+      id: 'rec_quiche_thon',
+      n: 'Quiche au thon et aux câpres',
+      s: 4,
+      i: [
+        {
+          id: 'ing9',
+          p: 'la totalité',
+          d: '400g de thon en boîte'
+        }
+      ],
+      inst: [
+        'Dans un saladier, mélangez le thon égoutté et les câpres',
+        'Ajoutez 4 œufs, 200g de fromage frais et 20cl de lait',
+        'Poivrez généreusement',
+        'Garnissez un moule à tarte de la pâte brisée'
+      ],
+      notes: 'Se conserve 1-2 jours au réfrigérateur, peut être congelée.'
+    }
+  ],
+  '2': [
+    {
+      id: 'rec_salade_med',
+      n: 'Salade Méditerranéenne',
+      s: 4,
+      i: [
+        {
+          id: 'ing1',
+          p: 'la totalité',
+          d: '500g de tomates cerises'
+        }
+      ],
+      inst: [
+        'Laver et couper les légumes en morceaux',
+        'Préparer la vinaigrette',
+        'Mélanger le tout et servir frais'
+      ],
+      notes: 'À consommer dans les 24h.'
+    }
+  ]
+};
+
+// Sample equipment for each plan
+const sampleEquipment: Record<string, Equipment[]> = {
+  '1': [
+    {
+      n: 'Planche à découper',
+      d: 'Surface non poreuse, min 40x30'
+    },
+    {
+      n: 'Couteau de chef',
+      d: 'Lame de 20cm'
+    }
+  ],
+  '2': [
+    {
+      n: 'Saladier',
+      d: 'Grand saladier pour mélanger'
+    },
+    {
+      n: 'Couteau',
+      d: 'Pour couper les légumes'
+    }
+  ]
+};
 
 // Simple data for plan 1 (based on real format but simplified)
 const simplePlan1: BatchCookingData = {
@@ -59,68 +128,10 @@ const simplePlan1: BatchCookingData = {
       u: 'pièces',
       notes: '(1)',
       r: 2
-    },
-    {
-      id: 'ing3',
-      cat: 'Fruits & Légumes',
-      n: 'Champignons de Paris',
-      q: '1000g',
-      u: 'g',
-      notes: '(b: 250g:750)',
-      r: '1000g'
-    },
-    {
-      id: 'ing4',
-      cat: 'Fruits & Légumes',
-      n: 'Poireaux',
-      q: 8,
-      u: 'pièces',
-      notes: '(e)',
-      r: 8
-    },
-    {
-      id: 'ing5',
-      cat: 'Fruits & Légumes',
-      n: 'Carottes',
-      q: 4,
-      u: 'pièces',
-      notes: '(d)',
-      r: 4
     }
   ],
-  e: [
-    {
-      n: 'Planche à découper',
-      d: 'Surface non poreuse, min 40x30'
-    },
-    {
-      n: 'Couteau de chef',
-      d: 'Lame de 20cm'
-    },
-    {
-      n: 'Poêle',
-      d: 'Grande poêle antiadhésive'
-    }
-  ],
-  r: [
-    {
-      id: 'rec_quiche_thon',
-      n: 'Quiche au thon et aux câpres',
-      s: 1,
-      i: [
-        {
-          id: 'ing9',
-          p: 'la totalité',
-          d: '400g de thon en boîte'
-        }
-      ],
-      inst: [
-        'Dans un saladier, mélangez le thon égoutté et les câpres, 4 œufs, 200g de fromage frais et 20cl de lait. Poivrez généreusement.',
-        'Garnissez un moule à tarte de la pâte brisée.'
-      ],
-      notes: 'Se conserve 1-2 jours au réfrigérateur, peut être congelée.'
-    }
-  ],
+  e: sampleEquipment['1'],
+  r: sampleRecipes['1'],
   b: {
     d: '3h30',
     p: [
@@ -135,7 +146,7 @@ const simplePlan1: BatchCookingData = {
             t: [
               {
                 t: '00:00',
-                i: 'Désinfecter la surface de travail (plan de travail, planches, ustensiles) avec un produit adapté.',
+                i: 'Désinfecter la surface de travail',
                 c: false,
                 pr: 'all'
               },
@@ -183,35 +194,8 @@ const simplePlan2: BatchCookingData = {
       r: '0'
     }
   ],
-  e: [
-    {
-      n: 'Couteau',
-      d: 'Pour couper les légumes'
-    },
-    {
-      n: 'Saladier',
-      d: 'Pour les mélanges'
-    }
-  ],
-  r: [
-    {
-      id: 'r1',
-      n: 'Salade méditerranéenne',
-      s: 1,
-      i: [
-        {
-          id: '5',
-          p: '500g',
-          d: 'Tomates cerises coupées en deux'
-        }
-      ],
-      inst: [
-        'Laver et couper les légumes',
-        'Mélanger avec la vinaigrette'
-      ],
-      notes: 'Conserver au frais'
-    }
-  ],
+  e: sampleEquipment['2'],
+  r: sampleRecipes['2'],
   b: {
     d: '2h15',
     p: [
@@ -226,7 +210,7 @@ const simplePlan2: BatchCookingData = {
             t: [
               {
                 t: '00:10',
-                i: 'Détruire tous  les légumes',
+                i: 'Couper tous les légumes',
                 c: false,
                 pr: 'all'
               }
